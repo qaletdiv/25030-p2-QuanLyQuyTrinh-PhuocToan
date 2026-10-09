@@ -1,0 +1,77 @@
+const requestsData = [
+  {
+    id: "REQ-001",
+    requestTypeId: "rt-leave",
+    createdBy: "u-employee-1",
+    createdAt: "2026-10-05T08:30:00.000Z",
+    status: "Chờ duyệt",
+    currentLevel: 1,
+    formData: {
+      leaveType: "Nghỉ phép năm",
+      startDate: "2026-10-15",
+      endDate: "2026-10-16",
+      totalDays: 2,
+      reason: "Giải quyết công việc gia đình",
+      handoverUserId: "u-employee-2",
+    },
+    attachments: [
+      { name: "giay_hen_gia_dinh.pdf", size: "1.2 MB" },
+    ],
+  },
+  {
+    id: "REQ-002",
+    requestTypeId: "rt-leave",
+    createdBy: "u-employee-1",
+    createdAt: "2026-10-02T09:00:00.000Z",
+    status: "Đang duyệt cấp 2",
+    currentLevel: 2,
+    formData: {
+      leaveType: "Nghỉ phép năm",
+      startDate: "2026-10-20",
+      endDate: "2026-10-22",
+      totalDays: 3,
+      reason: "Về quê thăm gia đình",
+      handoverUserId: "u-employee-2",
+    },
+    attachments: [],
+  },
+  {
+    id: "REQ-003",
+    requestTypeId: "rt-leave",
+    createdBy: "u-employee-1",
+    createdAt: "2026-09-19T14:00:00.000Z",
+    status: "Đã duyệt hoàn tất",
+    currentLevel: 2,
+    formData: {
+      leaveType: "Nghỉ phép năm",
+      startDate: "2026-09-22",
+      endDate: "2026-09-23",
+      totalDays: 2,
+      reason: "Khám sức khỏe định kỳ",
+      handoverUserId: "u-employee-2",
+    },
+    attachments: [
+      { name: "phieu_kham_suc_khoe.png", size: "850 KB" },
+    ],
+  },
+  {
+    id: "REQ-004",
+    requestTypeId: "rt-leave",
+    createdBy: "u-employee-1",
+    createdAt: "2026-09-25T10:00:00.000Z",
+    status: "Bị từ chối",
+    currentLevel: 1,
+    formData: {
+      leaveType: "Nghỉ không lương",
+      startDate: "2026-09-28",
+      endDate: "2026-10-02",
+      totalDays: 5,
+      reason: "Du lịch cá nhân",
+      handoverUserId: "u-employee-2",
+    },
+    attachments: [],
+  },
+];
+
+module.exports = { requestsData };
+
