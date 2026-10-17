@@ -16,6 +16,14 @@ export default function DynamicRequestForm({
   const [endDate, setEndDate] = useState("");
   const [totalDays, setTotalDays] = useState(1);
   const [fileError, setFileError] = useState("");
+  const [dateError, setDateError] = useState("");
+
+  // Chuẩn hóa ngày hôm nay dạng YYYY-MM-DD theo giờ địa phương
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  const minDateStr = `${yyyy}-${mm}-${dd}`;
 
   const [state, formAction, isPending] = useActionState(
     createRequestAction,
@@ -25,20 +33,37 @@ export default function DynamicRequestForm({
   const currentType =
     requestTypes.find((t) => t.id === selectedTypeId) || requestTypes[0];
 
-  // Tự động tính số ngày nghỉ khi chọn ngày
+  // Tự động tính số ngày nghỉ khi chọn ngày & kiểm tra tính hợp lệ
   const handleStartDateChange = (e) => {
     const start = e.target.value;
     setStartDate(start);
-    calculateDays(start, endDate);
+    validateAndCalculateDays(start, endDate);
   };
 
   const handleEndDateChange = (e) => {
     const end = e.target.value;
     setEndDate(end);
-    calculateDays(startDate, end);
+    validateAndCalculateDays(startDate, end);
   };
 
-  const calculateDays = (start, end) => {
+  const validateAndCalculateDays = (start, end) => {
+    // 1. Kiểm tra ngày bắt đầu không ở trong quá khứ
+    if (start && start < minDateStr) {
+      setDateError("Ngày bắt đầu nghỉ không được chọn trong quá khứ!");
+      setTotalDays(0);
+      return;
+    }
+
+    // 2. Kiểm tra ngày kết thúc >= ngày bắt đầu
+    if (start && end && end < start) {
+      setDateError("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu!");
+      setTotalDays(0);
+      return;
+    }
+
+    setDateError("");
+
+    // 3. Tính tổng số ngày nghỉ hợp lệ
     if (start && end) {
       const d1 = new Date(start);
       const d2 = new Date(end);
@@ -136,10 +161,10 @@ export default function DynamicRequestForm({
         </div>
 
         {/* Thông báo lỗi */}
-        {(state?.error || fileError) && (
+        {(state?.error || fileError || dateError) && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-600 text-xs rounded-xl flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-            <span>{state?.error || fileError}</span>
+            <span>{dateError || fileError || state?.error}</span>
           </div>
         )}
 
@@ -172,6 +197,7 @@ export default function DynamicRequestForm({
               <input
                 type="date"
                 name="startDate"
+                min={minDateStr}
                 required
                 disabled={isPending}
                 value={startDate}
@@ -186,6 +212,7 @@ export default function DynamicRequestForm({
               <input
                 type="date"
                 name="endDate"
+                min={startDate || minDateStr}
                 required
                 disabled={isPending}
                 value={endDate}
@@ -280,7 +307,7 @@ export default function DynamicRequestForm({
             </Link>
             <button
               type="submit"
-              disabled={isPending || Boolean(fileError)}
+              disabled={isPending || Boolean(fileError) || Boolean(dateError) || totalDays <= 0}
               className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors duration-150 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isPending ? (

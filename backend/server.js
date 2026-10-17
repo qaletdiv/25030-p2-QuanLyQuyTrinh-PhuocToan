@@ -147,6 +147,22 @@ app.post('/api/requests', authenticate, (req, res) => {
     }
   }
 
+  // Validate ngày nếu có
+  if (formData.startDate) {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    if (formData.startDate < todayStr) {
+      return res.status(400).json({ message: 'Ngày bắt đầu nghỉ không được ở trong quá khứ' });
+    }
+    if (formData.endDate && formData.endDate < formData.startDate) {
+      return res.status(400).json({ message: 'Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu' });
+    }
+  }
+
   const newRequestId = `REQ-${String(requests.length + 1).padStart(3, '0')}`;
   const newRequest = {
     id: newRequestId,
