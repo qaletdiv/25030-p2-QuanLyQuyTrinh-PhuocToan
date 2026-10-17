@@ -12,11 +12,20 @@ export default function DynamicRequestForm({
   const [selectedTypeId, setSelectedTypeId] = useState(
     requestTypes[0]?.id || "rt-leave",
   );
+
+  // State cho Đơn nghỉ phép (rt-leave)
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [totalDays, setTotalDays] = useState(1);
-  const [fileError, setFileError] = useState("");
   const [dateError, setDateError] = useState("");
+
+  // State cho Đơn mua hàng (rt-purchase)
+  const [purchaseReason, setPurchaseReason] = useState("");
+  const [items, setItems] = useState([
+    { name: "", quantity: 1, price: 0, amount: 0 },
+  ]);
+
+  const [fileError, setFileError] = useState("");
 
   // Chuẩn hóa ngày hôm nay dạng YYYY-MM-DD theo giờ địa phương
   const today = new Date();
@@ -33,7 +42,7 @@ export default function DynamicRequestForm({
   const currentType =
     requestTypes.find((t) => t.id === selectedTypeId) || requestTypes[0];
 
-  // Tự động tính số ngày nghỉ khi chọn ngày & kiểm tra tính hợp lệ
+  // Logic Đơn nghỉ phép: Tự động tính số ngày nghỉ khi chọn ngày & validate
   const handleStartDateChange = (e) => {
     const start = e.target.value;
     setStartDate(start);
@@ -47,14 +56,12 @@ export default function DynamicRequestForm({
   };
 
   const validateAndCalculateDays = (start, end) => {
-    // 1. Kiểm tra ngày bắt đầu không ở trong quá khứ
     if (start && start < minDateStr) {
       setDateError("Ngày bắt đầu nghỉ không được chọn trong quá khứ!");
       setTotalDays(0);
       return;
     }
 
-    // 2. Kiểm tra ngày kết thúc >= ngày bắt đầu
     if (start && end && end < start) {
       setDateError("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu!");
       setTotalDays(0);
@@ -63,7 +70,6 @@ export default function DynamicRequestForm({
 
     setDateError("");
 
-    // 3. Tính tổng số ngày nghỉ hợp lệ
     if (start && end) {
       const d1 = new Date(start);
       const d2 = new Date(end);
@@ -76,6 +82,38 @@ export default function DynamicRequestForm({
       }
     }
   };
+
+  // Logic Đơn mua hàng: Thêm / sửa / xóa sản phẩm & tính tiền tự động
+  const handleItemChange = (index, field, value) => {
+    const updated = [...items];
+    if (field === "quantity") {
+      const q = Math.max(1, parseInt(value) || 0);
+      updated[index].quantity = q;
+      updated[index].amount = q * (updated[index].price || 0);
+    } else if (field === "price") {
+      const p = Math.max(0, parseInt(value) || 0);
+      updated[index].price = p;
+      updated[index].amount = (updated[index].quantity || 1) * p;
+    } else {
+      updated[index][field] = value;
+    }
+    setItems(updated);
+  };
+
+  const handleAddItem = () => {
+    setItems([...items, { name: "", quantity: 1, price: 0, amount: 0 }]);
+  };
+
+  const handleRemoveItem = (index) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, idx) => idx !== index));
+    }
+  };
+
+  const totalPurchaseAmount = items.reduce(
+    (sum, item) => sum + (Number(item.amount) || 0),
+    0
+  );
 
   // Kiểm tra file đính kèm <= 5MB
   const handleFileChange = (e) => {
@@ -91,8 +129,20 @@ export default function DynamicRequestForm({
     }
   };
 
+  const isPurchase = selectedTypeId === "rt-purchase";
+
+  const isSubmitDisabled =
+    isPending ||
+    Boolean(fileError) ||
+    (!isPurchase &&
+      (Boolean(dateError) || totalDays <= 0 || !startDate || !endDate)) ||
+    (isPurchase &&
+      (!purchaseReason.trim() ||
+        totalPurchaseAmount <= 0 ||
+        items.some((it) => !it.name.trim() || it.price <= 0)));
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Tiêu đề */}
       <div className="flex items-center justify-between pb-4 border-b border-slate-200">
         <div>
@@ -100,7 +150,7 @@ export default function DynamicRequestForm({
             Tạo yêu cầu phê duyệt mới
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Điền đầy đủ thông tin để gửi đơn đến cấp có thẩm quyền phê duyệt
+            Chọn loại đơn và điền thông tin chi tiết theo quy trình chuẩn
           </p>
         </div>
         <Link
@@ -156,136 +206,303 @@ export default function DynamicRequestForm({
             Bước 2: Thông tin chi tiết — {currentType?.name}
           </label>
           <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-            Mẫu chuẩn
+            {isPurchase ? "Mẫu Đơn Mua Hàng & Vật Tư" : "Mẫu Đơn Nghỉ Phép Chuẩn"}
           </span>
         </div>
 
         {/* Thông báo lỗi */}
-        {(state?.error || fileError || dateError) && (
+        {(state?.error || fileError || (!isPurchase && dateError)) && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-600 text-xs rounded-xl flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
             <span>{dateError || fileError || state?.error}</span>
           </div>
         )}
 
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="space-y-5">
           <input type="hidden" name="requestTypeId" value={selectedTypeId} />
 
-          {/* 1. Loại nghỉ phép */}
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Hình thức nghỉ phép <span className="text-rose-500">*</span>
-            </label>
-            <select
-              name="leaveType"
-              required
-              disabled={isPending}
-              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-            >
-              <option value="Nghỉ phép năm">Nghỉ phép năm (hưởng lương)</option>
-              <option value="Nghỉ ốm">Nghỉ ốm / Khám chữa bệnh</option>
-              <option value="Nghỉ không lương">Nghỉ không lương</option>
-            </select>
-          </div>
+          {/* =========================================================
+              TRƯỜNG HỢP 1: ĐƠN NGHỈ PHÉP (rt-leave)
+             ========================================================= */}
+          {!isPurchase ? (
+            <div className="space-y-4">
+              {/* 1. Loại nghỉ phép */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Hình thức nghỉ phép <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  name="leaveType"
+                  required
+                  disabled={isPending}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                >
+                  <option value="Nghỉ phép năm">Nghỉ phép năm (hưởng lương)</option>
+                  <option value="Nghỉ ốm">Nghỉ ốm / Khám chữa bệnh</option>
+                  <option value="Nghỉ không lương">Nghỉ không lương</option>
+                </select>
+              </div>
 
-          {/* 2. Từ ngày & Đến ngày */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Từ ngày <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                name="startDate"
-                min={minDateStr}
-                required
-                disabled={isPending}
-                value={startDate}
-                onChange={handleStartDateChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-              />
+              {/* 2. Từ ngày & Đến ngày */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Từ ngày <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="startDate"
+                    min={minDateStr}
+                    required
+                    disabled={isPending}
+                    value={startDate}
+                    onChange={handleStartDateChange}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Đến ngày <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    name="endDate"
+                    min={startDate || minDateStr}
+                    required
+                    disabled={isPending}
+                    value={endDate}
+                    onChange={handleEndDateChange}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  />
+                </div>
+              </div>
+
+              {/* 3. Tổng số ngày nghỉ (Tự động tính) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-700">
+                    Tổng số ngày nghỉ (Hệ thống tự tính)
+                  </label>
+                  <span className="text-[10px] text-slate-400">
+                    Tự động cộng ngày
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  name="totalDays"
+                  readOnly
+                  value={totalDays}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-700 font-bold cursor-not-allowed"
+                />
+              </div>
+
+              {/* 4. Lý do nghỉ */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Lý do xin nghỉ <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  name="reason"
+                  required
+                  rows={3}
+                  disabled={isPending}
+                  placeholder="Ghi rõ lý do xin nghỉ phép để người duyệt xem xét..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+
+              {/* 5. Người bàn giao công việc */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Người bàn giao công việc (Cùng phòng ban){" "}
+                  <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  name="handoverUserId"
+                  required
+                  disabled={isPending}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                >
+                  {colleagues.length > 0 ? (
+                    colleagues.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.email})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="none">
+                      Chưa có nhân viên khác trong phòng ban
+                    </option>
+                  )}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Đến ngày <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                name="endDate"
-                min={startDate || minDateStr}
-                required
-                disabled={isPending}
-                value={endDate}
-                onChange={handleEndDateChange}
-                className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-              />
+          ) : (
+            /* =========================================================
+               TRƯỜNG HỢP 2: ĐƠN MUA HÀNG (rt-purchase)
+               ========================================================= */
+            <div className="space-y-4">
+              {/* 1. Lý do mua sắm */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Lý do / Mục đích mua sắm <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  name="reason"
+                  required
+                  rows={2}
+                  disabled={isPending}
+                  value={purchaseReason}
+                  onChange={(e) => setPurchaseReason(e.target.value)}
+                  placeholder="Mô tả mục đích mua sắm (VD: Phục vụ dự án phát triển phần mềm quý 4, bổ sung trang thiết bị văn phòng...)"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+
+              {/* 2. Danh sách sản phẩm mua sắm (Bảng động) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-slate-700">
+                    Danh sách sản phẩm / vật tư cần mua <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddItem}
+                    disabled={isPending}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                  >
+                    <span>+</span>
+                    <span>Thêm dòng sản phẩm</span>
+                  </button>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                        <th className="py-2.5 px-3 w-10 text-center">#</th>
+                        <th className="py-2.5 px-3">Tên sản phẩm / Thiết bị</th>
+                        <th className="py-2.5 px-3 w-24">Số lượng</th>
+                        <th className="py-2.5 px-3 w-36">Đơn giá dự kiến (VNĐ)</th>
+                        <th className="py-2.5 px-3 w-36 text-right">Thành tiền (VNĐ)</th>
+                        <th className="py-2.5 px-3 w-16 text-center">Xóa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {items.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="py-2 px-3 text-center text-slate-400 font-medium">
+                            {idx + 1}
+                          </td>
+                          <td className="py-2 px-3">
+                            <input
+                              type="text"
+                              required
+                              disabled={isPending}
+                              value={item.name}
+                              onChange={(e) => handleItemChange(idx, "name", e.target.value)}
+                              placeholder="VD: Màn hình Dell Ultrasharp 27 inch..."
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-900 focus:outline-none focus:border-blue-600"
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <input
+                              type="number"
+                              min="1"
+                              required
+                              disabled={isPending}
+                              value={item.quantity}
+                              onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-900 text-center focus:outline-none focus:border-blue-600"
+                            />
+                          </td>
+                          <td className="py-2 px-3">
+                            <input
+                              type="number"
+                              min="0"
+                              step="50000"
+                              required
+                              disabled={isPending}
+                              value={item.price || ""}
+                              onChange={(e) => handleItemChange(idx, "price", e.target.value)}
+                              placeholder="0"
+                              className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-900 text-right focus:outline-none focus:border-blue-600"
+                            />
+                          </td>
+                          <td className="py-2 px-3 text-right font-bold text-slate-800">
+                            {new Intl.NumberFormat("vi-VN").format(item.amount || 0)} đ
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {items.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(idx)}
+                                disabled={isPending}
+                                className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1 rounded transition-colors text-xs font-bold cursor-pointer"
+                                title="Xóa dòng này"
+                              >
+                                ✕
+                              </button>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 3. Card Tổng tiền & Gợi ý Luồng rẽ nhánh thông minh */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 block">
+                      Tổng tiền đơn hàng (Hệ thống tự tính)
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      Tự động cộng dồn Thành tiền của tất cả các sản phẩm
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xl font-extrabold text-blue-700">
+                      {new Intl.NumberFormat("vi-VN").format(totalPurchaseAmount)} VNĐ
+                    </span>
+                  </div>
+                </div>
+
+                {/* Banner nghiệp vụ rẽ nhánh */}
+                {totalPurchaseAmount > 10000000 ? (
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-2">
+                    <span className="text-sm shrink-0">⚡</span>
+                    <div>
+                      <strong className="font-bold">Đơn mua sắm giá trị cao (&gt; 10.000.000 VNĐ):</strong>
+                      <p className="mt-0.5 text-amber-700 leading-relaxed">
+                        Hệ thống tự động kích hoạt điều kiện rẽ nhánh: Đơn sẽ chuyển tiếp lên <strong>Giám đốc tài chính (CFO)</strong> thẩm định và ký duyệt sau khi Trưởng phòng duyệt xong.
+                      </p>
+                    </div>
+                  </div>
+                ) : totalPurchaseAmount > 0 ? (
+                  <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
+                    <span className="text-sm shrink-0">✓</span>
+                    <span>
+                      <strong>Đơn mua sắm tiêu chuẩn (≤ 10.000.000 VNĐ):</strong> Áp dụng quy trình phê duyệt thông thường qua 1 cấp Trưởng phòng.
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Hidden inputs cho Đơn mua hàng để Server Action gửi API */}
+              <input type="hidden" name="items" value={JSON.stringify(items)} />
+              <input type="hidden" name="totalAmount" value={totalPurchaseAmount} />
             </div>
-          </div>
+          )}
 
-          {/* 3. Tổng số ngày nghỉ (Tự động tính) */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-medium text-slate-700">
-                Tổng số ngày nghỉ (Hệ thống tự tính)
-              </label>
-              <span className="text-[10px] text-slate-400">
-                Tự động cộng ngày
-              </span>
-            </div>
-            <input
-              type="number"
-              name="totalDays"
-              readOnly
-              value={totalDays}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-700 font-bold cursor-not-allowed"
-            />
-          </div>
-
-          {/* 4. Lý do nghỉ */}
+          {/* 6. Đính kèm tệp chung (≤ 5MB) */}
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">
-              Lý do xin nghỉ <span className="text-rose-500">*</span>
-            </label>
-            <textarea
-              name="reason"
-              required
-              rows={3}
-              disabled={isPending}
-              placeholder="Ghi rõ lý do xin nghỉ phép để người duyệt xem xét..."
-              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-            />
-          </div>
-
-          {/* 5. Người bàn giao công việc (Dropdown đồng nghiệp cùng phòng ban) */}
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Người bàn giao công việc (Cùng phòng ban){" "}
-              <span className="text-rose-500">*</span>
-            </label>
-            <select
-              name="handoverUserId"
-              required
-              disabled={isPending}
-              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-            >
-              {colleagues.length > 0 ? (
-                colleagues.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.email})
-                  </option>
-                ))
-              ) : (
-                <option value="none">
-                  Chưa có nhân viên khác trong phòng ban
-                </option>
-              )}
-            </select>
-          </div>
-
-          {/* 6. Đính kèm tệp (≤ 5MB) */}
-          <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
-              Tệp đính kèm (Tùy chọn — JPG, PNG, PDF ≤ 5MB)
+              Tệp đính kèm ({isPurchase ? "Báo giá, hóa đơn tham khảo..." : "Giấy khám, minh chứng..."} — JPG, PNG, PDF ≤ 5MB)
             </label>
             <input
               type="file"
@@ -298,7 +515,7 @@ export default function DynamicRequestForm({
           </div>
 
           {/* Nút gửi đơn */}
-          <div className="pt-2 flex items-center justify-end gap-3">
+          <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">
             <Link
               href="/dashboard"
               className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-xl transition-colors"
@@ -307,8 +524,8 @@ export default function DynamicRequestForm({
             </Link>
             <button
               type="submit"
-              disabled={isPending || Boolean(fileError) || Boolean(dateError) || totalDays <= 0}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors duration-150 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={isSubmitDisabled}
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl shadow-xs transition-colors duration-150 disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
             >
               {isPending ? (
                 <Spinner size="sm" text="Đang gửi đơn..." />

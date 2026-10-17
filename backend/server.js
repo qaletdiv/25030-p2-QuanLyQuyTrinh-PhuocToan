@@ -140,6 +140,16 @@ app.post('/api/requests', authenticate, (req, res) => {
     return res.status(404).json({ message: 'Loại đơn không tồn tại' });
   }
 
+  // Chuẩn hóa dữ liệu mảng items và số tiền totalAmount nếu có
+  if (typeof formData.items === 'string') {
+    try {
+      formData.items = JSON.parse(formData.items);
+    } catch (e) {}
+  }
+  if (formData.totalAmount) {
+    formData.totalAmount = Number(formData.totalAmount);
+  }
+
   // Validate các trường bắt buộc theo schema
   for (const field of type.fields) {
     if (field.required && !formData[field.name]) {
@@ -147,7 +157,7 @@ app.post('/api/requests', authenticate, (req, res) => {
     }
   }
 
-  // Validate ngày nếu có
+  // Validate ngày nếu có (Đơn nghỉ phép)
   if (formData.startDate) {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -240,6 +250,36 @@ app.get('/api/requests/my', authenticate, (req, res) => {
   return res.json(populated);
 });
 
+// Helper tính toán các cấp duyệt thực tế (hỗ trợ điều kiện rẽ nhánh conditionalRules)
+function getEffectiveFlowSteps(requestTypeId, formData) {
+  const flowConfig = approvalFlows.find((f) => f.requestTypeId === requestTypeId);
+  if (!flowConfig) return [];
+  const steps = [...(flowConfig.steps || []).map((s) => ({ ...s }))];
+
+  if (Array.isArray(flowConfig.conditionalRules)) {
+    for (const rule of flowConfig.conditionalRules) {
+      if (rule.isActive !== false) {
+        const val = Number(formData?.[rule.field] || 0);
+        let conditionMet = false;
+        if (rule.operator === '>' && val > Number(rule.value)) conditionMet = true;
+        if (rule.operator === '>=' && val >= Number(rule.value)) conditionMet = true;
+        if (rule.operator === '<' && val < Number(rule.value)) conditionMet = true;
+        if (rule.operator === '<=' && val <= Number(rule.value)) conditionMet = true;
+        if (rule.operator === '==' && val === Number(rule.value)) conditionMet = true;
+
+        if (conditionMet && rule.insertStep) {
+          if (!steps.some((s) => s.title === rule.insertStep.title || s.level === rule.insertStep.level)) {
+            steps.push({ ...rule.insertStep, isConditional: true });
+          }
+        }
+      }
+    }
+  }
+
+  steps.sort((a, b) => a.level - b.level);
+  return steps;
+}
+
 // Lấy chi tiết đơn yêu cầu kèm tiến trình duyệt & nhật ký (A.4 & A.5)
 app.get('/api/requests/:id', authenticate, (req, res) => {
   const request = requests.find((r) => r.id === req.params.id);
@@ -258,7 +298,7 @@ app.get('/api/requests/:id', authenticate, (req, res) => {
 
   const type = requestTypes.find((t) => t.id === request.requestTypeId);
   const creator = users.find((u) => u.id === request.createdBy);
-  const flowConfig = approvalFlows.find((f) => f.requestTypeId === request.requestTypeId);
+  const effectiveSteps = getEffectiveFlowSteps(request.requestTypeId, request.formData);
   const logs = approvalLogs.filter((l) => l.requestId === request.id);
 
   let handoverUser = null;
@@ -286,7 +326,7 @@ app.get('/api/requests/:id', authenticate, (req, res) => {
           email: handoverUser.email,
         }
       : null,
-    flow: flowConfig ? flowConfig.steps : [],
+    flow: effectiveSteps,
     logs: logs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)),
   });
 });
@@ -307,8 +347,8 @@ app.get('/api/approvals', authenticate, (req, res) => {
   const formatRequest = (r) => {
     const type = requestTypes.find((t) => t.id === r.requestTypeId);
     const creator = users.find((u) => u.id === r.createdBy);
-    const flow = approvalFlows.find((f) => f.requestTypeId === r.requestTypeId);
-    const currentStep = flow ? flow.steps.find((s) => s.level === (r.currentLevel || 1)) : null;
+    const effectiveSteps = getEffectiveFlowSteps(r.requestTypeId, r.formData);
+    const currentStep = effectiveSteps.find((s) => s.level === (r.currentLevel || 1));
 
     return {
       ...r,
@@ -322,7 +362,7 @@ app.get('/api/approvals', authenticate, (req, res) => {
           }
         : null,
       currentStepTitle: currentStep ? currentStep.title : `Cấp ${r.currentLevel || 1}`,
-      totalSteps: flow ? flow.steps.length : 1,
+      totalSteps: effectiveSteps.length || 1,
     };
   };
 
@@ -338,10 +378,10 @@ app.get('/api/approvals', authenticate, (req, res) => {
       // Admin duyệt được tất cả
       if (req.user.role === 'admin') return true;
 
-      const flow = approvalFlows.find((f) => f.requestTypeId === r.requestTypeId);
-      if (!flow) return true;
+      const effectiveSteps = getEffectiveFlowSteps(r.requestTypeId, r.formData);
+      if (!effectiveSteps.length) return true;
 
-      const currentStep = flow.steps.find((s) => s.level === (r.currentLevel || 1));
+      const currentStep = effectiveSteps.find((s) => s.level === (r.currentLevel || 1));
       if (!currentStep) return false;
 
       const creator = users.find((u) => u.id === r.createdBy);
@@ -352,10 +392,11 @@ app.get('/api/approvals', authenticate, (req, res) => {
       }
 
       // Nếu bước 2 (HR): user phải thuộc phòng Nhân sự
-      if (currentStep.level === 2 && r.requestTypeId === 'rt-leave') {
+      if (currentStep.title?.includes('Nhân sự') || (r.requestTypeId === 'rt-leave' && currentStep.level === 2)) {
         return req.user.department === 'Nhân sự & Hành chính';
       }
 
+      // Nếu bước CFO hoặc cấp rẽ nhánh khác
       return true;
     })
     .map(formatRequest);
@@ -425,7 +466,7 @@ app.post('/api/requests/:id/approve', authenticate, (req, res) => {
 
   const { note } = req.body;
   const currentLvl = request.currentLevel || 1;
-  const flow = approvalFlows.find((f) => f.requestTypeId === request.requestTypeId);
+  const effectiveSteps = getEffectiveFlowSteps(request.requestTypeId, request.formData);
 
   // 1. Ghi nhật ký duyệt
   const newLog = {
@@ -442,22 +483,25 @@ app.post('/api/requests/:id/approve', authenticate, (req, res) => {
 
   // 2. Chuyển cấp hoặc hoàn tất
   const nextLevel = currentLvl + 1;
-  const nextStep = flow ? flow.steps.find((s) => s.level === nextLevel) : null;
+  const nextStep = effectiveSteps.find((s) => s.level === nextLevel);
 
   if (nextStep) {
     request.currentLevel = nextLevel;
     request.status = `Đang duyệt cấp ${nextLevel}`;
 
     // Tạo thông báo cho người duyệt cấp tiếp theo (A.7)
-    const nextApprover =
-      users.find((u) => u.role === 'approver' && u.department === 'Nhân sự & Hành chính') ||
-      users.find((u) => u.role === 'approver' && u.id !== req.user.id);
+    let nextApprover = null;
+    if (nextStep.title?.includes('Nhân sự')) {
+      nextApprover = users.find((u) => u.role === 'approver' && u.department === 'Nhân sự & Hành chính');
+    } else {
+      nextApprover = users.find((u) => u.role === 'approver' && u.id !== req.user.id);
+    }
 
     if (nextApprover) {
       notifications.push({
         id: `notif-${Date.now()}`,
         userId: nextApprover.id,
-        message: `Có đơn ${request.id} từ ${request.createdBy} đang chờ bạn duyệt ở cấp ${nextLevel}`,
+        message: `Có đơn ${request.id} từ ${request.createdBy} đang chờ bạn duyệt ở cấp ${nextLevel}: ${nextStep.title}`,
         isRead: false,
         createdAt: new Date().toISOString(),
         relatedRequestId: request.id,

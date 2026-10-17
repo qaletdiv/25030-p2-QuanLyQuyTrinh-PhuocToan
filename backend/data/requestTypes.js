@@ -51,7 +51,26 @@ const requestTypesData = [
     name: "Đơn mua hàng",
     description: "Dành cho đề xuất mua sắm trang thiết bị, vật tư văn phòng.",
     isActive: true,
-    fields: [],
+    fields: [
+      {
+        name: "reason",
+        label: "Lý do mua sắm",
+        type: "textarea",
+        required: true,
+      },
+      {
+        name: "items",
+        label: "Danh sách sản phẩm",
+        type: "table",
+        required: true,
+      },
+      {
+        name: "totalAmount",
+        label: "Tổng tiền đơn hàng",
+        type: "number",
+        required: true,
+      },
+    ],
   },
 ];
 

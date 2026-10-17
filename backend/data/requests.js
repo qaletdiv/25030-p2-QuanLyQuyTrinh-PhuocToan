@@ -67,6 +67,23 @@ const requestsData = [
     },
     attachments: [],
   },
+  {
+    id: "REQ-005",
+    requestTypeId: "rt-purchase",
+    createdBy: "u-employee-1",
+    createdAt: "2026-10-10T10:30:00.000Z",
+    status: "Chờ duyệt",
+    currentLevel: 1,
+    formData: {
+      reason: "Mua sắm thiết bị màn hình và bàn phím cơ cho nhân viên dự án mới",
+      items: [
+        { name: "Màn hình Dell Ultrasharp 27 inch", quantity: 2, price: 6500000, amount: 13000000 },
+        { name: "Bàn phím cơ Keychron K2", quantity: 2, price: 1800000, amount: 3600000 },
+      ],
+      totalAmount: 16600000,
+    },
+    attachments: [{ name: "bao_gia_thiet_bi.pdf", size: "1.5 MB" }],
+  },
 ];
 
 module.exports = { requestsData };
