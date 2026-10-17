@@ -2,7 +2,8 @@ const requestTypesData = [
   {
     id: "rt-leave",
     name: "Đơn nghỉ phép",
-    description: "Dành cho nhân viên xin nghỉ phép năm, nghỉ ốm, hoặc nghỉ không lương.",
+    description:
+      "Dành cho nhân viên xin nghỉ phép năm, nghỉ ốm, hoặc nghỉ không lương.",
     isActive: true,
     fields: [
       {
@@ -55,4 +56,3 @@ const requestTypesData = [
 ];
 
 module.exports = { requestTypesData };
-

@@ -275,6 +275,473 @@ app.get('/api/requests/:id', authenticate, (req, res) => {
   });
 });
 
+/* =========================================================================
+   APPROVAL ROUTES (A.5 — Danh sách duyệt đơn & Xử lý phê duyệt)
+========================================================================= */
+
+// Lấy danh sách đơn cần duyệt và lịch sử duyệt của Approver
+app.get('/api/approvals', authenticate, (req, res) => {
+  if (req.user.role !== 'approver' && req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền truy cập danh sách duyệt đơn' });
+  }
+
+  const { tab, search } = req.query; // tab = 'pending' | 'history'
+
+  // Helper để format đơn kèm thông tin
+  const formatRequest = (r) => {
+    const type = requestTypes.find((t) => t.id === r.requestTypeId);
+    const creator = users.find((u) => u.id === r.createdBy);
+    const flow = approvalFlows.find((f) => f.requestTypeId === r.requestTypeId);
+    const currentStep = flow ? flow.steps.find((s) => s.level === (r.currentLevel || 1)) : null;
+
+    return {
+      ...r,
+      requestTypeName: type ? type.name : 'Loại đơn khác',
+      creator: creator
+        ? {
+            id: creator.id,
+            name: creator.name,
+            email: creator.email,
+            department: creator.department,
+          }
+        : null,
+      currentStepTitle: currentStep ? currentStep.title : `Cấp ${r.currentLevel || 1}`,
+      totalSteps: flow ? flow.steps.length : 1,
+    };
+  };
+
+  // 1. Danh sách chờ xử lý (Pending)
+  // Chỉ hiện đơn đang ở đúng bước mà user hiện tại được phân quyền xử lý
+  const pendingList = requests
+    .filter((r) => {
+      // Đơn phải chưa kết thúc
+      if (r.status === 'Đã duyệt hoàn tất' || r.status === 'Bị từ chối') {
+        return false;
+      }
+
+      // Admin duyệt được tất cả
+      if (req.user.role === 'admin') return true;
+
+      const flow = approvalFlows.find((f) => f.requestTypeId === r.requestTypeId);
+      if (!flow) return true;
+
+      const currentStep = flow.steps.find((s) => s.level === (r.currentLevel || 1));
+      if (!currentStep) return false;
+
+      const creator = users.find((u) => u.id === r.createdBy);
+
+      // Nếu bước 1 (Trưởng phòng): user phải cùng phòng ban với người tạo đơn (hoặc là approver phòng đó)
+      if (currentStep.level === 1) {
+        return req.user.department === creator?.department;
+      }
+
+      // Nếu bước 2 (HR): user phải thuộc phòng Nhân sự
+      if (currentStep.level === 2 && r.requestTypeId === 'rt-leave') {
+        return req.user.department === 'Nhân sự & Hành chính';
+      }
+
+      return true;
+    })
+    .map(formatRequest);
+
+  // 2. Danh sách đã xử lý (History)
+  // Các đơn mà approver này đã từng ký duyệt hoặc từ chối
+  const myLogs = approvalLogs.filter((l) => l.approverId === req.user.id);
+  const myProcessedRequestIds = new Set(myLogs.map((l) => l.requestId));
+
+  const historyList = requests
+    .filter((r) => myProcessedRequestIds.has(r.id))
+    .map((r) => {
+      const formatted = formatRequest(r);
+      const myLog = myLogs.find((l) => l.requestId === r.id);
+      return {
+        ...formatted,
+        myAction: myLog ? myLog.action : null,
+        myNote: myLog ? myLog.note : null,
+        processedAt: myLog ? myLog.timestamp : null,
+      };
+    });
+
+  // Áp dụng tìm kiếm nếu có
+  let resultPending = pendingList;
+  let resultHistory = historyList;
+
+  if (search) {
+    const s = search.toLowerCase();
+    resultPending = resultPending.filter(
+      (r) =>
+        r.id.toLowerCase().includes(s) ||
+        r.creator?.name?.toLowerCase().includes(s) ||
+        r.requestTypeName?.toLowerCase().includes(s)
+    );
+    resultHistory = resultHistory.filter(
+      (r) =>
+        r.id.toLowerCase().includes(s) ||
+        r.creator?.name?.toLowerCase().includes(s) ||
+        r.requestTypeName?.toLowerCase().includes(s)
+    );
+  }
+
+  return res.json({
+    pending: resultPending,
+    history: resultHistory,
+    counts: {
+      pending: pendingList.length,
+      history: historyList.length,
+    },
+  });
+});
+
+// Phê duyệt đơn (Approve - A.5)
+app.post('/api/requests/:id/approve', authenticate, (req, res) => {
+  if (req.user.role !== 'approver' && req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền phê duyệt đơn' });
+  }
+
+  const request = requests.find((r) => r.id === req.params.id);
+  if (!request) {
+    return res.status(404).json({ message: 'Không tìm thấy đơn yêu cầu' });
+  }
+
+  if (request.status === 'Đã duyệt hoàn tất' || request.status === 'Bị từ chối') {
+    return res.status(400).json({ message: 'Đơn này đã hoàn tất hoặc đã bị từ chối trước đó' });
+  }
+
+  const { note } = req.body;
+  const currentLvl = request.currentLevel || 1;
+  const flow = approvalFlows.find((f) => f.requestTypeId === request.requestTypeId);
+
+  // 1. Ghi nhật ký duyệt
+  const newLog = {
+    id: `log-${Date.now()}`,
+    requestId: request.id,
+    level: currentLvl,
+    approverId: req.user.id,
+    approverName: req.user.name,
+    action: 'approve',
+    note: note ? note.trim() : 'Đồng ý phê duyệt.',
+    timestamp: new Date().toISOString(),
+  };
+  approvalLogs.push(newLog);
+
+  // 2. Chuyển cấp hoặc hoàn tất
+  const nextLevel = currentLvl + 1;
+  const nextStep = flow ? flow.steps.find((s) => s.level === nextLevel) : null;
+
+  if (nextStep) {
+    request.currentLevel = nextLevel;
+    request.status = `Đang duyệt cấp ${nextLevel}`;
+
+    // Tạo thông báo cho người duyệt cấp tiếp theo (A.7)
+    const nextApprover =
+      users.find((u) => u.role === 'approver' && u.department === 'Nhân sự & Hành chính') ||
+      users.find((u) => u.role === 'approver' && u.id !== req.user.id);
+
+    if (nextApprover) {
+      notifications.push({
+        id: `notif-${Date.now()}`,
+        userId: nextApprover.id,
+        message: `Có đơn ${request.id} từ ${request.createdBy} đang chờ bạn duyệt ở cấp ${nextLevel}`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        relatedRequestId: request.id,
+      });
+    }
+  } else {
+    request.status = 'Đã duyệt hoàn tất';
+
+    // Thông báo cho người tạo đơn (A.7)
+    notifications.push({
+      id: `notif-${Date.now()}`,
+      userId: request.createdBy,
+      message: `Đơn ${request.id} của bạn đã được ${req.user.name} phê duyệt hoàn tất`,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      relatedRequestId: request.id,
+    });
+  }
+
+  console.log(`[APPROVE] ${req.user.name} đã duyệt đơn ${request.id} -> Trạng thái: ${request.status}`);
+
+  return res.json({
+    success: true,
+    message: 'Phê duyệt đơn thành công',
+    request,
+  });
+});
+
+// Từ chối đơn (Reject - A.5: BẮT BUỘC nhập lý do)
+app.post('/api/requests/:id/reject', authenticate, (req, res) => {
+  if (req.user.role !== 'approver' && req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền từ chối đơn' });
+  }
+
+  const request = requests.find((r) => r.id === req.params.id);
+  if (!request) {
+    return res.status(404).json({ message: 'Không tìm thấy đơn yêu cầu' });
+  }
+
+  if (request.status === 'Đã duyệt hoàn tất' || request.status === 'Bị từ chối') {
+    return res.status(400).json({ message: 'Đơn này đã hoàn tất hoặc đã bị từ chối trước đó' });
+  }
+
+  const { reason } = req.body;
+  if (!reason || !reason.trim()) {
+    return res.status(400).json({ message: 'Bắt buộc phải nhập lý do khi từ chối đơn' });
+  }
+
+  const currentLvl = request.currentLevel || 1;
+
+  // 1. Ghi nhật ký từ chối
+  const newLog = {
+    id: `log-${Date.now()}`,
+    requestId: request.id,
+    level: currentLvl,
+    approverId: req.user.id,
+    approverName: req.user.name,
+    action: 'reject',
+    note: reason.trim(),
+    timestamp: new Date().toISOString(),
+  };
+  approvalLogs.push(newLog);
+
+  // 2. Chuyển trạng thái sang Bị từ chối và dừng quy trình
+  request.status = 'Bị từ chối';
+
+  // 3. Tạo thông báo cho người tạo đơn kèm lý do cụ thể (A.7)
+  notifications.push({
+    id: `notif-${Date.now()}`,
+    userId: request.createdBy,
+    message: `Đơn ${request.id} của bạn đã bị từ chối bởi ${req.user.name}. Lý do: ${reason.trim()}`,
+    isRead: false,
+    createdAt: new Date().toISOString(),
+    relatedRequestId: request.id,
+  });
+
+  console.log(`[REJECT] ${req.user.name} đã từ chối đơn ${request.id}. Lý do: ${reason.trim()}`);
+
+  return res.json({
+    success: true,
+    message: 'Đã từ chối đơn thành công',
+    request,
+  });
+});
+
+/* =========================================================================
+   ADMIN ROUTES (A.6 — Quản lý loại đơn & Cấu hình luồng duyệt)
+========================================================================= */
+
+// 1. Lấy toàn bộ danh sách loại đơn (bao gồm cả loại đơn đã ẩn)
+app.get('/api/admin/request-types', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
+  }
+  return res.json(requestTypes);
+});
+
+// 2. Thêm loại đơn mới (A.6)
+app.post('/api/admin/request-types', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
+  }
+
+  const { name, description, isActive } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ message: 'Tên loại đơn không được để trống' });
+  }
+
+  const newType = {
+    id: `rt-${Date.now()}`,
+    name: name.trim(),
+    description: description ? description.trim() : '',
+    isActive: isActive !== undefined ? Boolean(isActive) : true,
+    fields: [],
+  };
+
+  requestTypes.push(newType);
+
+  // Tạo mặc định 1 luồng duyệt cơ bản cho loại đơn này
+  approvalFlows.push({
+    requestTypeId: newType.id,
+    steps: [{ level: 1, title: 'Trưởng phòng phê duyệt', approverRole: 'approver' }],
+    conditionalRules: [],
+  });
+
+  return res.status(201).json({
+    success: true,
+    message: 'Tạo loại đơn mới thành công',
+    requestType: newType,
+  });
+});
+
+// 3. Cập nhật loại đơn (A.6)
+app.put('/api/admin/request-types/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
+  }
+
+  const type = requestTypes.find((t) => t.id === req.params.id);
+  if (!type) {
+    return res.status(404).json({ message: 'Không tìm thấy loại đơn' });
+  }
+
+  const { name, description, isActive } = req.body;
+  if (name !== undefined) type.name = name.trim();
+  if (description !== undefined) type.description = description.trim();
+  if (isActive !== undefined) type.isActive = Boolean(isActive);
+
+  return res.json({
+    success: true,
+    message: 'Cập nhật loại đơn thành công',
+    requestType: type,
+  });
+});
+
+// 4. Bật / Tắt trạng thái ẩn/hiện loại đơn (Toggle Active)
+app.patch('/api/admin/request-types/:id/toggle', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
+  }
+
+  const type = requestTypes.find((t) => t.id === req.params.id);
+  if (!type) {
+    return res.status(404).json({ message: 'Không tìm thấy loại đơn' });
+  }
+
+  type.isActive = !type.isActive;
+
+  return res.json({
+    success: true,
+    message: `Đã ${type.isActive ? 'hiển thị' : 'ẩn'} loại đơn thành công`,
+    requestType: type,
+  });
+});
+
+// 5. Xóa loại đơn (Delete)
+app.delete('/api/admin/request-types/:id', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
+  }
+
+  const index = requestTypes.findIndex((t) => t.id === req.params.id);
+  if (index === -1) {
+    return res.status(404).json({ message: 'Không tìm thấy loại đơn' });
+  }
+
+  // Nếu đang có đơn sử dụng loại đơn này thì chuyển sang ẩn thay vì xóa cứng
+  const hasRequests = requests.some((r) => r.requestTypeId === req.params.id);
+  if (hasRequests) {
+    requestTypes[index].isActive = false;
+    return res.json({
+      success: true,
+      message: 'Loại đơn này đã phát sinh đơn trong hệ thống nên đã được tự động chuyển sang trạng thái Ẩn thay vì xóa hẳn.',
+    });
+  }
+
+  requestTypes.splice(index, 1);
+  return res.json({
+    success: true,
+    message: 'Đã xóa loại đơn thành công',
+  });
+});
+
+// 6. Lấy toàn bộ cấu hình luồng duyệt
+app.get('/api/admin/approval-flows', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
+  }
+
+  const populated = approvalFlows.map((flow) => {
+    const type = requestTypes.find((t) => t.id === flow.requestTypeId);
+    return {
+      ...flow,
+      requestTypeName: type ? type.name : 'Loại đơn khác',
+      isTypeActive: type ? type.isActive : false,
+    };
+  });
+
+  return res.json(populated);
+});
+
+// 7. Cập nhật cấu hình luồng duyệt & điều kiện rẽ nhánh cho 1 loại đơn (A.6)
+app.put('/api/admin/approval-flows/:requestTypeId', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
+  }
+
+  const { steps, conditionalRules } = req.body;
+  if (!Array.isArray(steps) || steps.length === 0) {
+    return res.status(400).json({ message: 'Luồng duyệt phải có ít nhất 1 cấp duyệt' });
+  }
+
+  let flow = approvalFlows.find((f) => f.requestTypeId === req.params.requestTypeId);
+  if (!flow) {
+    flow = {
+      requestTypeId: req.params.requestTypeId,
+      steps: [],
+      conditionalRules: [],
+    };
+    approvalFlows.push(flow);
+  }
+
+  // Format lại cấp thứ tự 1, 2, 3...
+  flow.steps = steps.map((s, index) => ({
+    level: index + 1,
+    title: s.title || `Cấp ${index + 1}`,
+    approverRole: s.approverRole || 'approver',
+  }));
+
+  if (Array.isArray(conditionalRules)) {
+    flow.conditionalRules = conditionalRules;
+  }
+
+  return res.json({
+    success: true,
+    message: 'Cập nhật cấu hình luồng duyệt thành công',
+    flow,
+  });
+});
+
+/* =========================================================================
+   NOTIFICATION ROUTES (A.7 — Hệ thống thông báo)
+========================================================================= */
+
+// Lấy danh sách thông báo của người dùng đăng nhập
+app.get('/api/notifications', authenticate, (req, res) => {
+  const userNotifs = notifications
+    .filter((n) => n.userId === req.user.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const unreadCount = userNotifs.filter((n) => !n.isRead).length;
+
+  return res.json({
+    notifications: userNotifs,
+    unreadCount,
+  });
+});
+
+// Đánh dấu 1 thông báo là đã đọc
+app.patch('/api/notifications/:id/read', authenticate, (req, res) => {
+  const notif = notifications.find((n) => n.id === req.params.id && n.userId === req.user.id);
+  if (!notif) {
+    return res.status(404).json({ message: 'Không tìm thấy thông báo' });
+  }
+
+  notif.isRead = true;
+  return res.json({ success: true, message: 'Đã đánh dấu đọc', notification: notif });
+});
+
+// Đánh dấu toàn bộ thông báo của user là đã đọc
+app.post('/api/notifications/mark-all-read', authenticate, (req, res) => {
+  notifications
+    .filter((n) => n.userId === req.user.id)
+    .forEach((n) => {
+      n.isRead = true;
+    });
+
+  return res.json({ success: true, message: 'Đã đánh dấu tất cả thông báo là đã đọc' });
+});
+
 // Khởi chạy server
 app.listen(PORT, () => {
   console.log(`===============================================`);

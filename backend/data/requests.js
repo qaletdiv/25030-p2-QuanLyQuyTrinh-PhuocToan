@@ -14,9 +14,7 @@ const requestsData = [
       reason: "Giải quyết công việc gia đình",
       handoverUserId: "u-employee-2",
     },
-    attachments: [
-      { name: "giay_hen_gia_dinh.pdf", size: "1.2 MB" },
-    ],
+    attachments: [{ name: "giay_hen_gia_dinh.pdf", size: "1.2 MB" }],
   },
   {
     id: "REQ-002",
@@ -50,9 +48,7 @@ const requestsData = [
       reason: "Khám sức khỏe định kỳ",
       handoverUserId: "u-employee-2",
     },
-    attachments: [
-      { name: "phieu_kham_suc_khoe.png", size: "850 KB" },
-    ],
+    attachments: [{ name: "phieu_kham_suc_khoe.png", size: "850 KB" }],
   },
   {
     id: "REQ-004",
@@ -74,4 +70,3 @@ const requestsData = [
 ];
 
 module.exports = { requestsData };
-
