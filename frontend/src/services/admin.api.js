@@ -152,3 +152,24 @@ export const updateApprovalFlowApi = async (requestTypeId, flowData) => {
   }
   return data;
 };
+
+// Lấy số liệu thống kê Dashboard Admin
+export const getAdminDashboardStatsApi = async () => {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+
+  const response = await fetch(`${BASE_URL}/api/admin/dashboard-stats`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || "Không thể tải thống kê bảng điều khiển");
+  }
+  return data;
+};

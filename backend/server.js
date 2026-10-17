@@ -599,6 +599,45 @@ app.get('/api/admin/request-types', authenticate, (req, res) => {
   return res.json(requestTypes);
 });
 
+// Thống kê Dashboard cho Admin (A.2)
+app.get('/api/admin/dashboard-stats', authenticate, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
+  }
+
+  const totalRequests = requests.length;
+  const activeUsers = users.length;
+  const approvedCount = requests.filter((r) => r.status === 'Đã duyệt hoàn tất').length;
+  const rejectedCount = requests.filter((r) => r.status === 'Bị từ chối').length;
+  const processed = approvedCount + rejectedCount;
+  const successRate = processed > 0 ? ((approvedCount / processed) * 100).toFixed(1) : '100';
+
+  const leaveCount = requests.filter((r) => r.requestTypeId === 'rt-leave').length;
+  const purchaseCount = requests.filter((r) => r.requestTypeId === 'rt-purchase').length;
+
+  const deptMap = {};
+  for (const u of users) {
+    const dept = u.department || 'Chung';
+    deptMap[dept] = (deptMap[dept] || 0) + 1;
+  }
+  const departments = Object.entries(deptMap).map(([name, count]) => ({
+    name,
+    users: count,
+  }));
+
+  return res.json({
+    totalRequests,
+    activeUsers,
+    successRate: `${successRate}%`,
+    requestTypeStats: {
+      leave: leaveCount,
+      purchase: purchaseCount,
+      total: totalRequests || 1,
+    },
+    departments,
+  });
+});
+
 // 2. Thêm loại đơn mới (A.6)
 app.post('/api/admin/request-types', authenticate, (req, res) => {
   if (req.user.role !== 'admin') {
