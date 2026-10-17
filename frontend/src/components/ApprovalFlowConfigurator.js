@@ -176,12 +176,12 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
           <div>
-            <h3 className="text-base font-bold text-slate-800">
+            <h3 className="text-base font-bold text-slate-900">
               1. Cấu hình các cấp duyệt ({steps.length} cấp)
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-600 mt-0.5 font-medium">
               Thiết lập thứ tự duyệt từ cấp 1 đến khi hoàn tất cho:{" "}
-              <strong>{selectedTypeInfo?.name || selectedTypeId}</strong>
+              <strong className="text-blue-700 font-bold">{selectedTypeInfo?.name || selectedTypeId}</strong>
             </p>
           </div>
 
@@ -202,10 +202,10 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
               className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
             >
               <div className="flex items-center gap-3 shrink-0">
-                <span className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
+                <span className="w-8 h-8 rounded-full bg-blue-600 text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
                   {step.level}
                 </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
                   Cấp {step.level}
                 </span>
               </div>
@@ -217,7 +217,7 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                     value={step.title}
                     onChange={(e) => handleUpdateStepTitle(idx, e.target.value)}
                     placeholder="Tên chức danh hoặc bộ phận duyệt..."
-                    className="w-full px-3 py-1.5 text-xs font-medium border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full px-3.5 py-2 text-sm font-semibold text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-2xs placeholder:text-slate-400"
                   />
                 </div>
 
@@ -229,7 +229,7 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                       updated[idx].approverRole = e.target.value;
                       setSteps(updated);
                     }}
-                    className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full px-3.5 py-2 text-sm font-semibold text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-2xs cursor-pointer"
                   >
                     <option value="approver">Người duyệt (Approver)</option>
                     <option value="admin">Quản trị viên (Admin)</option>
@@ -241,7 +241,7 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                 <button
                   type="button"
                   onClick={() => handleRemoveStep(idx)}
-                  className="px-2.5 py-1 text-xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-md transition-colors cursor-pointer shrink-0"
+                  className="px-3 py-1.5 text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 border border-rose-200"
                   title="Xóa cấp duyệt này"
                 >
                   Xóa
@@ -306,11 +306,11 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
 
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                   <div>
-                    <label className="block text-slate-500 mb-1">Trường so sánh</label>
+                    <label className="block text-slate-700 font-bold mb-1">Trường so sánh</label>
                     <select
                       value={rule.field}
                       onChange={(e) => handleUpdateRule(idx, "field", e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold cursor-pointer"
                     >
                       <option value="totalAmount">Tổng tiền (totalAmount)</option>
                       <option value="totalDays">Tổng số ngày (totalDays)</option>
@@ -318,11 +318,11 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                   </div>
 
                   <div>
-                    <label className="block text-slate-500 mb-1">Toán tử</label>
+                    <label className="block text-slate-700 font-bold mb-1">Toán tử</label>
                     <select
                       value={rule.operator}
                       onChange={(e) => handleUpdateRule(idx, "operator", e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold cursor-pointer"
                     >
                       <option value=">">Lớn hơn (&gt;)</option>
                       <option value=">=">Lớn hơn hoặc bằng (&gt;=)</option>
@@ -332,17 +332,17 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                   </div>
 
                   <div>
-                    <label className="block text-slate-500 mb-1">Giá trị ngưỡng</label>
+                    <label className="block text-slate-700 font-bold mb-1">Giá trị ngưỡng</label>
                     <input
                       type="number"
                       value={rule.value}
                       onChange={(e) => handleUpdateRule(idx, "value", Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-slate-500 mb-1">Cấp chèn thêm</label>
+                    <label className="block text-slate-700 font-bold mb-1">Cấp chèn thêm</label>
                     <input
                       type="text"
                       value={rule.insertStep?.title || ""}
@@ -350,13 +350,13 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                         handleUpdateRule(idx, "insertStep.title", e.target.value)
                       }
                       placeholder="VD: Giám đốc tài chính (CFO)"
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white"
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold placeholder:text-slate-400"
                     />
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-500 italic bg-white p-2 rounded-lg border border-slate-100">
-                  Diễn giải: Nếu <strong>{rule.field}</strong> {rule.operator} {Number(rule.value).toLocaleString("vi-VN")}, sau khi duyệt cấp cố định xong, đơn sẽ tự động chèn thêm cấp duyệt: <strong>{rule.insertStep?.title}</strong>.
+                <p className="text-xs text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200">
+                  💡 Diễn giải: Nếu <strong className="text-slate-900">{rule.field}</strong> {rule.operator} <strong className="text-slate-900">{Number(rule.value).toLocaleString("vi-VN")}</strong>, sau khi duyệt cấp cố định xong, đơn sẽ tự động chèn thêm cấp duyệt: <strong className="text-blue-700 font-bold">{rule.insertStep?.title}</strong>.
                 </p>
               </div>
             ))}
