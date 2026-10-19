@@ -44,7 +44,7 @@ const authenticate = (req, res, next) => {
    AUTH ROUTES (A.1)
 ========================================================================= */
 app.post('/api/auth/register', (req, res) => {
-  const { name, email, password, department, role } = req.body;
+  const { name, email, password, department } = req.body;
   if (!name || !email || !password || !department) {
     return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin' });
   }
@@ -60,7 +60,7 @@ app.post('/api/auth/register', (req, res) => {
     email,
     password,
     department,
-    role: role || 'employee',
+    role: 'employee',
   };
 
   users.push(newUser);

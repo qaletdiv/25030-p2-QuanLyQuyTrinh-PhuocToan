@@ -36,6 +36,7 @@ export default function Sidebar({ role = 'employee' }) {
           alt="Logo"
           width={32}
           height={32}
+          priority
           className="rounded-lg ring-1 ring-white/10 shrink-0 shadow-xs"
         />
         <div className="min-w-0">
