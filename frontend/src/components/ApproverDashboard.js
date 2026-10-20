@@ -1,17 +1,24 @@
 import Link from "next/link";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faClock,
+  faClipboardCheck,
+  faArrowRight,
+} from "@fortawesome/free-solid-svg-icons";
 import { getApprovalsApi } from "@/services/approvals.api";
 import StatusBadge from "@/components/StatusBadge";
 
 export default async function ApproverDashboard() {
   let pendingList = [];
   let counts = { pending: 0, history: 0 };
+  let errorMsg = null;
 
   try {
     const data = await getApprovalsApi({ tab: "pending" });
     pendingList = data.pending || [];
     counts = data.counts || { pending: 0, history: 0 };
   } catch (err) {
-    console.error("Lỗi khi tải dữ liệu Approver Dashboard:", err);
+    errorMsg = err.message || "Không thể tải danh sách duyệt đơn của bạn. Vui lòng thử lại sau.";
   }
 
   // Lấy tối đa 5 đơn mới nhất cần xử lý
@@ -19,19 +26,33 @@ export default async function ApproverDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Banner thông báo lỗi nếu có */}
+      {errorMsg && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 text-sm p-4 rounded-xl flex items-center gap-2.5 shadow-xs">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+          <span className="font-medium">{errorMsg}</span>
+        </div>
+      )}
+
       {/* Thẻ thống kê */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-5 rounded-xl border bg-amber-50 text-amber-800 border-amber-200">
-          <p className="text-sm font-medium opacity-80">
-            Đơn đang chờ bạn duyệt
-          </p>
-          <p className="text-3xl font-bold mt-2">{counts.pending}</p>
+        <div className="p-5 rounded-xl border bg-amber-50 text-amber-800 border-amber-200 flex items-start justify-between">
+          <div>
+            <p className="text-sm font-medium opacity-80">
+              Đơn đang chờ bạn duyệt
+            </p>
+            <p className="text-3xl font-bold mt-2">{counts.pending}</p>
+          </div>
+          <FontAwesomeIcon icon={faClock} className="w-6 h-6 opacity-40 shrink-0 mt-1" />
         </div>
-        <div className="p-5 rounded-xl border bg-emerald-50 text-emerald-800 border-emerald-200">
-          <p className="text-sm font-medium opacity-80">
-            Bạn đã phê duyệt / xử lý
-          </p>
-          <p className="text-3xl font-bold mt-2">{counts.history}</p>
+        <div className="p-5 rounded-xl border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-start justify-between">
+          <div>
+            <p className="text-sm font-medium opacity-80">
+              Bạn đã phê duyệt / xử lý
+            </p>
+            <p className="text-3xl font-bold mt-2">{counts.history}</p>
+          </div>
+          <FontAwesomeIcon icon={faClipboardCheck} className="w-6 h-6 opacity-40 shrink-0 mt-1" />
         </div>
       </div>
 
@@ -43,9 +64,10 @@ export default async function ApproverDashboard() {
           </h2>
           <Link
             href="/approvals"
-            className="text-xs text-blue-600 hover:underline font-medium"
+            className="text-xs text-blue-600 hover:underline font-medium inline-flex items-center gap-1.5"
           >
-            Xem toàn bộ hàng đợi ({counts.pending}) →
+            <span>Xem toàn bộ hàng đợi ({counts.pending})</span>
+            <FontAwesomeIcon icon={faArrowRight} className="w-2.5 h-2.5" />
           </Link>
         </div>
 

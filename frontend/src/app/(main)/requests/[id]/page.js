@@ -1,5 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faArrowLeft,
+  faPaperclip,
+  faDownload,
+} from "@fortawesome/free-solid-svg-icons";
 import { getRequestDetailApi } from "@/services/requests.api";
 import StatusBadge from "@/components/StatusBadge";
 import ApprovalStepper from "@/components/ApprovalStepper";
@@ -17,10 +23,34 @@ export default async function RequestDetailPage({ params }) {
   const { id } = resolvedParams;
 
   let request = null;
+  let errorMsg = null;
+
   try {
     request = await getRequestDetailApi(id);
   } catch (err) {
-    notFound();
+    if (err.message && (err.message.includes("404") || err.message.toLowerCase().includes("không tìm thấy"))) {
+      notFound();
+    } else {
+      errorMsg = err.message || "Không thể tải chi tiết đơn yêu cầu. Vui lòng kiểm tra kết nối mạng.";
+    }
+  }
+
+  if (errorMsg || !request) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-4">
+        <Link
+          href="/requests"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+        >
+          <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
+          <span>Quay lại danh sách đơn</span>
+        </Link>
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 text-sm p-4 rounded-xl flex items-center gap-2.5 shadow-xs">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+          <span className="font-medium">{errorMsg || "Không tìm thấy dữ liệu đơn yêu cầu"}</span>
+        </div>
+      </div>
+    );
   }
 
   const { formData, attachments, flow, logs, requestType, creator, handoverUser } = request;
@@ -44,7 +74,7 @@ export default async function RequestDetailPage({ params }) {
             href="/requests"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors mb-2 cursor-pointer"
           >
-            <span>←</span>
+            <FontAwesomeIcon icon={faArrowLeft} className="w-3 h-3" />
             <span>Quay lại danh sách đơn</span>
           </Link>
           <div className="flex flex-wrap items-center gap-3">
@@ -194,9 +224,21 @@ export default async function RequestDetailPage({ params }) {
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-medium text-blue-600 hover:text-blue-800 shrink-0 cursor-pointer">
-                        Xem tệp
-                      </span>
+                      {file.url ? (
+                        <a
+                          href={file.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={file.name}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 shrink-0 hover:underline"
+                        >
+                          Tải / Xem tệp
+                        </a>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-400 shrink-0">
+                          Xem tệp
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -268,7 +310,7 @@ export default async function RequestDetailPage({ params }) {
                     >
                       <div className="flex items-center gap-2 overflow-hidden">
                         <span className="w-8 h-8 rounded bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center shrink-0">
-                          📎
+                          <FontAwesomeIcon icon={faPaperclip} className="w-3.5 h-3.5" />
                         </span>
                         <div className="truncate">
                           <p className="text-xs font-medium text-slate-800 truncate">
@@ -279,9 +321,21 @@ export default async function RequestDetailPage({ params }) {
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-medium text-blue-600 hover:text-blue-800 shrink-0 cursor-pointer">
-                        Xem tệp
-                      </span>
+                      {file.url ? (
+                        <a
+                          href={file.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={file.name}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 shrink-0 hover:underline"
+                        >
+                          Tải / Xem tệp
+                        </a>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-400 shrink-0">
+                          Xem tệp
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>

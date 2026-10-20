@@ -1,3 +1,6 @@
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
+
 export default function ApprovalStepper({ flow = [], currentStatus, currentLevel = 1, logs = [] }) {
   if (!flow || flow.length === 0) {
     return (
@@ -83,9 +86,9 @@ export default function ApprovalStepper({ flow = [], currentStatus, currentLevel
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 transition-transform ${circleClasses}`}
                 >
                   {stepState === "done" ? (
-                    <span className="text-base leading-none">✓</span>
+                    <FontAwesomeIcon icon={faCheck} className="w-4 h-4 text-white" />
                   ) : stepState === "rejected" ? (
-                    <span className="text-base leading-none">✕</span>
+                    <FontAwesomeIcon icon={faXmark} className="w-4 h-4 text-white" />
                   ) : (
                     <span>{step.level}</span>
                   )}

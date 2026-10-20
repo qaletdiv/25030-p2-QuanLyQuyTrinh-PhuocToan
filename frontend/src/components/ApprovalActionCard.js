@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCheck, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { approveRequestAction, rejectRequestAction } from "@/actions/approvals.actions";
 
 export default function ApprovalActionCard({ requestId, currentStatus, canApprove = true }) {
@@ -23,8 +25,8 @@ export default function ApprovalActionCard({ requestId, currentStatus, canApprov
   if (isCompleted) {
     return (
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center">
-        <span className="inline-block w-8 h-8 rounded-full bg-slate-200 text-slate-600 font-bold leading-8 mb-2">
-          ✓
+        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-slate-200 text-slate-600 mb-2">
+          <FontAwesomeIcon icon={faCheck} className="w-4 h-4" />
         </span>
         <h3 className="text-sm font-bold text-slate-800">
           Đơn này đã kết thúc xử lý
@@ -172,7 +174,7 @@ export default function ApprovalActionCard({ requestId, currentStatus, canApprov
                 </>
               ) : (
                 <>
-                  <span>✓</span>
+                  <FontAwesomeIcon icon={faCheck} className="w-3.5 h-3.5" />
                   <span>Xác nhận Phê duyệt đơn</span>
                 </>
               )}
@@ -217,7 +219,7 @@ export default function ApprovalActionCard({ requestId, currentStatus, canApprov
                 </>
               ) : (
                 <>
-                  <span>✕</span>
+                  <FontAwesomeIcon icon={faXmark} className="w-3.5 h-3.5" />
                   <span>Xác nhận Từ chối đơn</span>
                 </>
               )}

@@ -1,57 +1,91 @@
 import Link from "next/link";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faFileLines,
+  faClock,
+  faCircleCheck,
+  faArrowRight,
+} from "@fortawesome/free-solid-svg-icons";
 import { getMyRequestsApi } from "@/services/requests.api";
 import StatusBadge from "@/components/StatusBadge";
 
 export default async function EmployeeDashboard() {
   let requests = [];
+  let errorMsg = null;
+
   try {
     requests = await getMyRequestsApi();
   } catch (err) {
-    console.error("Lỗi khi tải dữ liệu Employee Dashboard:", err);
+    errorMsg = err.message || "Không thể tải dữ liệu hoạt động của nhân viên. Vui lòng kiểm tra kết nối.";
   }
 
-  // Tính toán số liệu thống kê thời gian thực từ dữ liệu đơn của nhân viên
+  // Tính toán số liệu thống kê thời gian thực từ dữ liệu đơn của nhân viên (A.2)
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
   const totalCount = requests.length;
   const pendingCount = requests.filter(
     (r) => r.status === "Chờ duyệt" || r.status.startsWith("Đang duyệt"),
   ).length;
-  const approvedCount = requests.filter(
-    (r) => r.status === "Đã duyệt hoàn tất",
-  ).length;
+
+  // Đơn được duyệt trong tháng hiện tại
+  const approvedThisMonth = requests.filter((r) => {
+    if (r.status !== "Đã duyệt hoàn tất") return false;
+    const d = new Date(r.updatedAt || r.createdAt);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  }).length;
 
   const stats = [
     {
-      title: "Tổng đơn của bạn",
+      title: "Tổng đơn đã gửi",
       value: totalCount,
       color: "bg-blue-50 text-blue-700 border-blue-200",
-      description: "Tất cả các đơn đã gửi",
+      description: "Tất cả các đơn bạn đã tạo",
+      icon: faFileLines,
     },
     {
       title: "Đang chờ duyệt",
       value: pendingCount,
       color: "bg-amber-50 text-amber-700 border-amber-200",
       description: "Chờ phê duyệt ở các cấp",
+      icon: faClock,
     },
     {
-      title: "Đã duyệt hoàn tất",
-      value: approvedCount,
+      title: "Duyệt trong tháng",
+      value: approvedThisMonth,
       color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      description: "Được chấp thuận hoàn tất",
+      description: `Đã phê duyệt trong Tháng ${currentMonth + 1}/${currentYear}`,
+      icon: faCircleCheck,
     },
   ];
 
-  // 5 Đơn gần nhất
-  const recentRequests = requests.slice(0, 5);
+  // 5 Đơn gần nhất (Sắp xếp giảm dần theo thời gian tạo thực tế)
+  const sortedRequests = [...requests].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+  const recentRequests = sortedRequests.slice(0, 5);
 
   return (
     <div className="space-y-6">
+      {/* Banner thông báo lỗi nếu tải dữ liệu thất bại */}
+      {errorMsg && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 text-sm p-4 rounded-xl flex items-center gap-2.5 shadow-xs">
+          <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+          <span className="font-medium">{errorMsg}</span>
+        </div>
+      )}
+
       {/* 3 Thẻ thống kê */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stats.map((s) => (
-          <div key={s.title} className={`p-5 rounded-xl border ${s.color}`}>
-            <p className="text-sm font-medium opacity-80">{s.title}</p>
-            <p className="text-3xl font-bold mt-2">{s.value}</p>
-            <p className="text-xs opacity-70 mt-1">{s.description}</p>
+          <div key={s.title} className={`p-5 rounded-xl border flex items-start justify-between ${s.color}`}>
+            <div>
+              <p className="text-sm font-medium opacity-80">{s.title}</p>
+              <p className="text-3xl font-bold mt-2">{s.value}</p>
+              <p className="text-xs opacity-70 mt-1">{s.description}</p>
+            </div>
+            <FontAwesomeIcon icon={s.icon} className="w-6 h-6 opacity-40 shrink-0 mt-1" />
           </div>
         ))}
       </div>
@@ -64,9 +98,10 @@ export default async function EmployeeDashboard() {
           </h2>
           <Link
             href="/requests"
-            className="text-xs text-blue-600 hover:underline font-medium"
+            className="text-xs text-blue-600 hover:underline font-medium inline-flex items-center gap-1.5"
           >
-            Xem tất cả ({totalCount}) →
+            <span>Xem tất cả ({totalCount})</span>
+            <FontAwesomeIcon icon={faArrowRight} className="w-2.5 h-2.5" />
           </Link>
         </div>
 

@@ -13,7 +13,9 @@ export default function AuthLayout({ children }) {
             alt="Logo"
             width={52}
             height={52}
-            className="mx-auto mb-3"
+            priority
+            unoptimized
+            className="mx-auto mb-3 rounded-xl shadow-xs"
           />
           <h1 className="text-2xl font-bold text-slate-800">
             Hệ Thống Duyệt Quy Trình

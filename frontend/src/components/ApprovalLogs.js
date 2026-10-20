@@ -1,3 +1,9 @@
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faCircleCheck,
+  faCircleXmark,
+} from "@fortawesome/free-solid-svg-icons";
+
 export default function ApprovalLogs({ logs = [] }) {
   if (!logs || logs.length === 0) {
     return (
@@ -47,13 +53,17 @@ export default function ApprovalLogs({ logs = [] }) {
 
               <div className="flex items-center gap-2">
                 <span
-                  className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                  className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-0.5 rounded-full font-medium ${
                     isApproved
                       ? "bg-emerald-100 text-emerald-800"
                       : "bg-rose-100 text-rose-800"
                   }`}
                 >
-                  {isApproved ? "✓ Đã phê duyệt" : "✕ Đã từ chối"}
+                  <FontAwesomeIcon
+                    icon={isApproved ? faCircleCheck : faCircleXmark}
+                    className="w-3 h-3"
+                  />
+                  <span>{isApproved ? "Đã phê duyệt" : "Đã từ chối"}</span>
                 </span>
                 <span className="text-xs text-slate-400">{dateFormatted}</span>
               </div>
