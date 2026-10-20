@@ -7,7 +7,8 @@ const PORT = 5000;
 const JWT_SECRET = 'quy_trinh_duyet_secret_key_2026';
 
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 /* =========================================================================
    IN-MEMORY DATABASE (Mục 1.2 Quản lý dữ liệu - Tách theo từng thực thể)
@@ -61,6 +62,7 @@ app.post('/api/auth/register', (req, res) => {
     password,
     department,
     role: 'employee',
+    isActive: true,
   };
 
   users.push(newUser);
@@ -72,6 +74,9 @@ app.post('/api/auth/login', (req, res) => {
   const user = users.find((u) => u.email.toLowerCase() === email?.toLowerCase());
   if (!user) return res.status(400).json({ message: 'Email không tồn tại' });
   if (user.password !== password) return res.status(400).json({ message: 'Sai mật khẩu' });
+
+  user.lastLoginAt = new Date().toISOString();
+  user.isActive = true;
 
   const token = jwt.sign(
     { id: user.id, email: user.email, role: user.role },
@@ -179,6 +184,7 @@ app.post('/api/requests', authenticate, (req, res) => {
     requestTypeId,
     createdBy: req.user.id,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     status: 'Chờ duyệt', // Trạng thái ban đầu bắt buộc theo mục 3
     formData,
     attachments: attachments || [],
@@ -186,21 +192,22 @@ app.post('/api/requests', authenticate, (req, res) => {
 
   requests.unshift(newRequest);
 
-  // Kích hoạt thông báo cho Người duyệt cấp 1 (A.7)
-  const approver = users.find(
-    (u) => u.role === 'approver' && u.department === req.user.department
-  ) || users.find((u) => u.role === 'approver');
-
-  if (approver) {
-    notifications.push({
-      id: `notif-${Date.now()}`,
-      userId: approver.id,
-      message: `Có đơn ${type.name} mới từ ${req.user.name} đang chờ bạn duyệt`,
-      isRead: false,
-      createdAt: new Date().toISOString(),
-      relatedRequestId: newRequestId,
-    });
-    console.log(`[NOTIF] Đã gửi thông báo tới người duyệt: ${approver.name}`);
+  // Kích hoạt thông báo cho Người duyệt cấp 1 của luồng duyệt (A.7)
+  const initialSteps = getEffectiveFlowSteps(type.id, formData);
+  const firstStep = initialSteps[0];
+  if (firstStep) {
+    const eligibleApprovers = users.filter((u) => canUserApproveStep(u, firstStep, req.user));
+    for (const approver of eligibleApprovers) {
+      notifications.push({
+        id: `notif-${Date.now()}-${approver.id}`,
+        userId: approver.id,
+        message: `Có đơn ${type.name} (${newRequestId}) từ ${req.user.name} đang chờ bạn duyệt ở cấp 1: ${firstStep.title}`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        relatedRequestId: newRequestId,
+      });
+      console.log(`[NOTIF] Đã gửi thông báo tới người duyệt cấp 1: ${approver.name}`);
+    }
   }
 
   console.log(`[REQUEST] Đã tạo đơn mới thành công: ${newRequestId} bởi ${req.user.name}`);
@@ -209,6 +216,47 @@ app.post('/api/requests', authenticate, (req, res) => {
     message: 'Tạo và gửi đơn thành công',
     request: newRequest,
   });
+});
+
+// Lấy danh sách trạng thái động theo số cấp của các luồng duyệt (A.4)
+app.get('/api/requests/statuses', authenticate, (req, res) => {
+  const intermediateLevels = new Set();
+
+  // Quét toàn bộ cấp duyệt trong cấu hình các luồng duyệt
+  for (const flow of approvalFlows) {
+    if (Array.isArray(flow.steps)) {
+      flow.steps.forEach((s) => {
+        if (s.level && s.level >= 2) intermediateLevels.add(s.level);
+      });
+    }
+    if (Array.isArray(flow.conditionalRules)) {
+      flow.conditionalRules.forEach((r) => {
+        if (r.insertStep?.level && r.insertStep.level >= 2) {
+          intermediateLevels.add(r.insertStep.level);
+        }
+      });
+    }
+  }
+
+  // Quét các đơn thực tế trong hệ thống
+  for (const r of requests) {
+    if (r.status && r.status.startsWith('Đang duyệt cấp ')) {
+      const match = r.status.match(/\d+/);
+      if (match) intermediateLevels.add(parseInt(match[0], 10));
+    }
+  }
+
+  const sortedLevels = Array.from(intermediateLevels).sort((a, b) => a - b);
+  const intermediateStatuses = sortedLevels.map((lvl) => `Đang duyệt cấp ${lvl}`);
+
+  const statuses = [
+    'Chờ duyệt',
+    ...intermediateStatuses,
+    'Đã duyệt hoàn tất',
+    'Bị từ chối',
+  ];
+
+  return res.json({ statuses, levels: sortedLevels });
 });
 
 // Lấy danh sách đơn của chính người dùng đăng nhập (A.4 - Đơn của tôi)
@@ -238,6 +286,9 @@ app.get('/api/requests/my', authenticate, (req, res) => {
     list = list.filter((r) => r.id.toLowerCase().includes(s));
   }
 
+  // Sắp xếp đơn mới nhất lên đầu tiên theo thời gian tạo
+  list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
   // Gắn kèm tên loại đơn
   const populated = list.map((r) => {
     const type = requestTypes.find((t) => t.id === r.requestTypeId);
@@ -250,11 +301,69 @@ app.get('/api/requests/my', authenticate, (req, res) => {
   return res.json(populated);
 });
 
-// Helper tính toán các cấp duyệt thực tế (hỗ trợ điều kiện rẽ nhánh conditionalRules)
+// Helper phân quyền người duyệt theo đối tượng duyệt (A.6)
+function canUserApproveStep(user, step, creator) {
+  if (!user || !step) return false;
+  // Quản trị viên (Admin) luôn có toàn quyền duyệt mọi cấp
+  if (user.role === 'admin') return true;
+  // Nhân viên thông thường không có quyền duyệt
+  if (user.role !== 'approver') return false;
+
+  const role = step.approverRole || '';
+  const title = (step.title || '').toLowerCase();
+
+  // 1. Quản trị viên chỉ định
+  if (role === 'admin') {
+    return user.role === 'admin';
+  }
+
+  // 2. Trưởng phòng của người tạo (cùng phòng ban với người tạo)
+  if (
+    role === 'manager' ||
+    title.includes('trưởng phòng') ||
+    title.includes('quản lý') ||
+    (step.level === 1 && !role)
+  ) {
+    if (!creator) return false;
+    return user.department === creator.department;
+  }
+
+  // 3. Bộ phận Nhân sự & Hành chính
+  if (
+    role === 'hr' ||
+    title.includes('nhân sự') ||
+    title.includes('hr')
+  ) {
+    return user.department === 'Nhân sự & Hành chính';
+  }
+
+  // 4. Giám đốc / Giám đốc tài chính (CFO / Ban Giám Đốc)
+  if (
+    role === 'cfo' ||
+    role === 'director' ||
+    title.includes('tài chính') ||
+    title.includes('cfo') ||
+    title.includes('giám đốc')
+  ) {
+    return (
+      user.department === 'Kế toán - Tài chính' ||
+      user.department === 'Ban Giám Đốc'
+    );
+  }
+
+  // 5. Người duyệt bất kỳ (Approver)
+  if (role === 'approver') {
+    return true;
+  }
+
+  return true;
+}
+
+// Helper tính toán các cấp duyệt thực tế (hỗ trợ điều kiện rẽ nhánh conditionalRules) (A.6)
 function getEffectiveFlowSteps(requestTypeId, formData) {
   const flowConfig = approvalFlows.find((f) => f.requestTypeId === requestTypeId);
   if (!flowConfig) return [];
-  const steps = [...(flowConfig.steps || []).map((s) => ({ ...s }))];
+  let steps = [...(flowConfig.steps || []).map((s) => ({ ...s }))];
 
   if (Array.isArray(flowConfig.conditionalRules)) {
     for (const rule of flowConfig.conditionalRules) {
@@ -266,10 +375,37 @@ function getEffectiveFlowSteps(requestTypeId, formData) {
         if (rule.operator === '<' && val < Number(rule.value)) conditionMet = true;
         if (rule.operator === '<=' && val <= Number(rule.value)) conditionMet = true;
         if (rule.operator === '==' && val === Number(rule.value)) conditionMet = true;
+        if (rule.operator === '=' && val === Number(rule.value)) conditionMet = true;
 
         if (conditionMet && rule.insertStep) {
-          if (!steps.some((s) => s.title === rule.insertStep.title || s.level === rule.insertStep.level)) {
-            steps.push({ ...rule.insertStep, isConditional: true });
+          // Tránh chèn trùng lặp nếu cùng rule đã được đưa vào
+          const alreadyInserted = steps.some(
+            (s) => (s.ruleId && s.ruleId === rule.id) || (s.title === rule.insertStep.title && s.isConditional)
+          );
+
+          if (!alreadyInserted) {
+            // Không bao giờ bỏ qua quy tắc nếu trùng số cấp: Dịch chuyển các bước có level >= targetLevel
+            const targetLevel = rule.insertStep.level ? Number(rule.insertStep.level) : steps.length + 1;
+            steps = steps.map((s) => {
+              if (s.level >= targetLevel) {
+                return { ...s, level: s.level + 1 };
+              }
+              return s;
+            });
+
+            steps.push({
+              ...rule.insertStep,
+              level: targetLevel,
+              isConditional: true,
+              ruleId: rule.id,
+              approverRole: rule.insertStep.approverRole || 'cfo',
+            });
+
+            // Sắp xếp và chuẩn hóa lại level tuần tự: 1, 2, 3...
+            steps.sort((a, b) => a.level - b.level);
+            steps.forEach((s, idx) => {
+              s.level = idx + 1;
+            });
           }
         }
       }
@@ -386,18 +522,8 @@ app.get('/api/approvals', authenticate, (req, res) => {
 
       const creator = users.find((u) => u.id === r.createdBy);
 
-      // Nếu bước 1 (Trưởng phòng): user phải cùng phòng ban với người tạo đơn (hoặc là approver phòng đó)
-      if (currentStep.level === 1) {
-        return req.user.department === creator?.department;
-      }
-
-      // Nếu bước 2 (HR): user phải thuộc phòng Nhân sự
-      if (currentStep.title?.includes('Nhân sự') || (r.requestTypeId === 'rt-leave' && currentStep.level === 2)) {
-        return req.user.department === 'Nhân sự & Hành chính';
-      }
-
-      // Nếu bước CFO hoặc cấp rẽ nhánh khác
-      return true;
+      // Phân quyền chuẩn xác theo đối tượng duyệt (hỗ trợ cả cấp chuẩn và cấp rẽ nhánh)
+      return canUserApproveStep(req.user, currentStep, creator);
     })
     .map(formatRequest);
 
@@ -467,6 +593,13 @@ app.post('/api/requests/:id/approve', authenticate, (req, res) => {
   const { note } = req.body;
   const currentLvl = request.currentLevel || 1;
   const effectiveSteps = getEffectiveFlowSteps(request.requestTypeId, request.formData);
+  const currentStep = effectiveSteps.find((s) => s.level === currentLvl);
+  const creator = users.find((u) => u.id === request.createdBy);
+
+  // Kiểm tra quyền duyệt cấp hiện tại
+  if (!canUserApproveStep(req.user, currentStep, creator)) {
+    return res.status(403).json({ message: 'Bạn không có quyền phê duyệt ở cấp này' });
+  }
 
   // 1. Ghi nhật ký duyệt
   const newLog = {
@@ -489,38 +622,48 @@ app.post('/api/requests/:id/approve', authenticate, (req, res) => {
     request.currentLevel = nextLevel;
     request.status = `Đang duyệt cấp ${nextLevel}`;
 
-    // Tạo thông báo cho người duyệt cấp tiếp theo (A.7)
-    let nextApprover = null;
-    if (nextStep.title?.includes('Nhân sự')) {
-      nextApprover = users.find((u) => u.role === 'approver' && u.department === 'Nhân sự & Hành chính');
-    } else {
-      nextApprover = users.find((u) => u.role === 'approver' && u.id !== req.user.id);
-    }
+    const type = requestTypes.find((t) => t.id === request.requestTypeId);
+    const typeName = type ? type.name : 'yêu cầu';
+    const creatorName = creator ? creator.name : 'Người tạo đơn';
 
-    if (nextApprover) {
+    // 1. Thông báo cho người duyệt cấp tiếp theo (hiện TÊN người tạo đơn, KHÔNG hiện mã user)
+    const nextApprovers = users.filter((u) => canUserApproveStep(u, nextStep, creator) && u.id !== req.user.id);
+    for (const nextApprover of nextApprovers) {
       notifications.push({
-        id: `notif-${Date.now()}`,
+        id: `notif-${Date.now()}-${nextApprover.id}`,
         userId: nextApprover.id,
-        message: `Có đơn ${request.id} từ ${request.createdBy} đang chờ bạn duyệt ở cấp ${nextLevel}: ${nextStep.title}`,
+        message: `Có đơn ${typeName} (${request.id}) từ ${creatorName} đang chờ bạn duyệt ở cấp ${nextLevel}: ${nextStep.title}`,
         isRead: false,
         createdAt: new Date().toISOString(),
         relatedRequestId: request.id,
       });
     }
+
+    // 2. Thông báo cho người tạo đơn theo mẫu "đã được [Tên] phê duyệt"
+    notifications.push({
+      id: `notif-${Date.now()}-${request.createdBy}`,
+      userId: request.createdBy,
+      message: `Đơn ${request.id} của bạn đã được ${req.user.name} phê duyệt ở cấp ${currentLvl} và chuyển sang cấp ${nextLevel}: ${nextStep.title}`,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      relatedRequestId: request.id,
+    });
   } else {
     request.status = 'Đã duyệt hoàn tất';
+    request.updatedAt = new Date().toISOString();
 
-    // Thông báo cho người tạo đơn (A.7)
+    // Thông báo cho người tạo đơn theo mẫu "đã được [Tên] phê duyệt"
     notifications.push({
-      id: `notif-${Date.now()}`,
+      id: `notif-${Date.now()}-${request.createdBy}`,
       userId: request.createdBy,
-      message: `Đơn ${request.id} của bạn đã được ${req.user.name} phê duyệt hoàn tất`,
+      message: `Đơn ${request.id} của bạn đã được ${req.user.name} phê duyệt`,
       isRead: false,
       createdAt: new Date().toISOString(),
       relatedRequestId: request.id,
     });
   }
 
+  request.updatedAt = new Date().toISOString();
   console.log(`[APPROVE] ${req.user.name} đã duyệt đơn ${request.id} -> Trạng thái: ${request.status}`);
 
   return res.json({
@@ -551,6 +694,14 @@ app.post('/api/requests/:id/reject', authenticate, (req, res) => {
   }
 
   const currentLvl = request.currentLevel || 1;
+  const effectiveSteps = getEffectiveFlowSteps(request.requestTypeId, request.formData);
+  const currentStep = effectiveSteps.find((s) => s.level === currentLvl);
+  const creator = users.find((u) => u.id === request.createdBy);
+
+  // Kiểm tra quyền từ chối ở cấp hiện tại
+  if (!canUserApproveStep(req.user, currentStep, creator)) {
+    return res.status(403).json({ message: 'Bạn không có quyền từ chối đơn ở cấp này' });
+  }
 
   // 1. Ghi nhật ký từ chối
   const newLog = {
@@ -567,12 +718,13 @@ app.post('/api/requests/:id/reject', authenticate, (req, res) => {
 
   // 2. Chuyển trạng thái sang Bị từ chối và dừng quy trình
   request.status = 'Bị từ chối';
+  request.updatedAt = new Date().toISOString();
 
-  // 3. Tạo thông báo cho người tạo đơn kèm lý do cụ thể (A.7)
+  // 3. Tạo thông báo cho người tạo đơn theo mẫu "đã được [Tên] từ chối" (A.7)
   notifications.push({
-    id: `notif-${Date.now()}`,
+    id: `notif-${Date.now()}-${request.createdBy}`,
     userId: request.createdBy,
-    message: `Đơn ${request.id} của bạn đã bị từ chối bởi ${req.user.name}. Lý do: ${reason.trim()}`,
+    message: `Đơn ${request.id} của bạn đã được ${req.user.name} từ chối. Lý do: ${reason.trim()}`,
     isRead: false,
     createdAt: new Date().toISOString(),
     relatedRequestId: request.id,
@@ -606,29 +758,128 @@ app.get('/api/admin/dashboard-stats', authenticate, (req, res) => {
   }
 
   const totalRequests = requests.length;
-  const activeUsers = users.length;
+
+  // Lọc chính xác danh sách tài khoản đang hoạt động (A.2)
+  const activeUserList = users.filter((u) => {
+    if (u.isActive === false || u.status === 'inactive') return false;
+    if (u.isActive === true) return true;
+    return (
+      u.role === 'admin' ||
+      Boolean(u.lastLoginAt) ||
+      requests.some((r) => r.createdBy === u.id) ||
+      approvalLogs.some((l) => l.approverId === u.id)
+    );
+  });
+  const activeUsers = activeUserList.length;
+
   const approvedCount = requests.filter((r) => r.status === 'Đã duyệt hoàn tất').length;
   const rejectedCount = requests.filter((r) => r.status === 'Bị từ chối').length;
+  const pendingCount = requests.filter(
+    (r) => r.status === 'Chờ duyệt' || r.status.startsWith('Đang duyệt')
+  ).length;
   const processed = approvedCount + rejectedCount;
   const successRate = processed > 0 ? ((approvedCount / processed) * 100).toFixed(1) : '100';
+
+  const now = new Date();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+
+  // 1. Thống kê theo tuần (4 tuần gần nhất từ dữ liệu thực tế)
+  const weeklyStats = [];
+  for (let i = 3; i >= 0; i--) {
+    const end = new Date(now.getTime() - i * 7 * oneDayMs);
+    end.setHours(23, 59, 59, 999);
+    const start = new Date(end.getTime() - 7 * oneDayMs + 1);
+    start.setHours(0, 0, 0, 0);
+
+    const count = requests.filter((r) => {
+      const d = new Date(r.createdAt).getTime();
+      return d >= start.getTime() && d <= end.getTime();
+    }).length;
+
+    const startLabel = `${start.getDate()}/${start.getMonth() + 1}`;
+    const endLabel = `${end.getDate()}/${end.getMonth() + 1}`;
+    weeklyStats.push({
+      label: `Tuần ${4 - i}`,
+      dateRange: `${startLabel} - ${endLabel}`,
+      count,
+    });
+  }
+
+  // 2. Thống kê theo tháng (6 tháng gần nhất từ dữ liệu thực tế)
+  const monthlyStats = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const label = `Tháng ${month + 1}/${year}`;
+    const shortLabel = `T${month + 1}`;
+
+    const count = requests.filter((r) => {
+      const reqDate = new Date(r.createdAt);
+      return reqDate.getFullYear() === year && reqDate.getMonth() === month;
+    }).length;
+
+    monthlyStats.push({
+      label,
+      shortLabel,
+      month: month + 1,
+      year,
+      count,
+    });
+  }
+
+  // 3. Tỷ lệ loại đơn phổ biến (Tính động từ toàn bộ requestTypes và requests thật)
+  const typeMap = {};
+  for (const t of requestTypes) {
+    typeMap[t.id] = { id: t.id, name: t.name, count: 0 };
+  }
+  for (const r of requests) {
+    if (typeMap[r.requestTypeId]) {
+      typeMap[r.requestTypeId].count += 1;
+    } else {
+      const type = requestTypes.find((t) => t.id === r.requestTypeId);
+      const name = type ? type.name : 'Loại đơn khác';
+      if (!typeMap[r.requestTypeId]) {
+        typeMap[r.requestTypeId] = { id: r.requestTypeId, name, count: 0 };
+      }
+      typeMap[r.requestTypeId].count += 1;
+    }
+  }
+  const requestTypeDistribution = Object.values(typeMap)
+    .map((item) => ({
+      ...item,
+      percentage: totalRequests > 0 ? Math.round((item.count / totalRequests) * 100) : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
 
   const leaveCount = requests.filter((r) => r.requestTypeId === 'rt-leave').length;
   const purchaseCount = requests.filter((r) => r.requestTypeId === 'rt-purchase').length;
 
+  // 4. Số tài khoản HOẠT ĐỘNG theo phòng ban (A.2 - Không đếm tài khoản vô hiệu hóa/chưa kích hoạt)
   const deptMap = {};
-  for (const u of users) {
+  for (const u of activeUserList) {
     const dept = u.department || 'Chung';
     deptMap[dept] = (deptMap[dept] || 0) + 1;
   }
-  const departments = Object.entries(deptMap).map(([name, count]) => ({
-    name,
-    users: count,
-  }));
+  const totalActiveUsers = activeUsers;
+  const departments = Object.entries(deptMap)
+    .map(([name, count]) => ({
+      name,
+      users: count,
+      percentage: totalActiveUsers > 0 ? Math.round((count / totalActiveUsers) * 100) : 0,
+    }))
+    .sort((a, b) => b.users - a.users);
 
   return res.json({
     totalRequests,
     activeUsers,
+    pendingCount,
+    approvedCount,
+    rejectedCount,
     successRate: `${successRate}%`,
+    weeklyStats,
+    monthlyStats,
+    requestTypeDistribution,
     requestTypeStats: {
       leave: leaveCount,
       purchase: purchaseCount,
@@ -662,7 +913,7 @@ app.post('/api/admin/request-types', authenticate, (req, res) => {
   // Tạo mặc định 1 luồng duyệt cơ bản cho loại đơn này
   approvalFlows.push({
     requestTypeId: newType.id,
-    steps: [{ level: 1, title: 'Trưởng phòng phê duyệt', approverRole: 'approver' }],
+    steps: [{ level: 1, title: 'Trưởng phòng phê duyệt', approverRole: 'manager' }],
     conditionalRules: [],
   });
 
@@ -791,7 +1042,14 @@ app.put('/api/admin/approval-flows/:requestTypeId', authenticate, (req, res) => 
   }));
 
   if (Array.isArray(conditionalRules)) {
-    flow.conditionalRules = conditionalRules;
+    flow.conditionalRules = conditionalRules.map((r) => ({
+      ...r,
+      insertStep: {
+        level: r.insertStep?.level ? Number(r.insertStep.level) : (steps.length + 1),
+        title: r.insertStep?.title || 'Cấp duyệt bổ sung',
+        approverRole: r.insertStep?.approverRole || 'cfo',
+      },
+    }));
   }
 
   return res.json({
