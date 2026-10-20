@@ -1,4 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faCheck,
+  faClipboardList,
+  faArrowRight,
+} from "@fortawesome/free-solid-svg-icons";
+import { getMeApi } from "@/services/auth.api";
 import { getApprovalsApi } from "@/services/approvals.api";
 import StatusBadge from "@/components/StatusBadge";
 import ApprovalsFilterBar from "@/components/ApprovalsFilterBar";
@@ -8,6 +16,10 @@ export const metadata = {
 };
 
 export default async function ApprovalsPage({ searchParams }) {
+  const user = await getMeApi();
+  if (user?.role !== "approver" && user?.role !== "admin") {
+    redirect("/dashboard");
+  }
   const resolvedSearchParams = await searchParams;
   const currentTab = resolvedSearchParams?.tab || "pending";
   const currentSearch = resolvedSearchParams?.search || "";
@@ -89,8 +101,11 @@ export default async function ApprovalsPage({ searchParams }) {
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         {currentList.length === 0 ? (
           <div className="py-16 text-center px-4">
-            <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400 font-bold text-lg">
-              {currentTab === "pending" ? "✓" : "📋"}
+            <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400">
+              <FontAwesomeIcon
+                icon={currentTab === "pending" ? faCheck : faClipboardList}
+                className="w-6 h-6"
+              />
             </div>
             <h3 className="text-base font-semibold text-slate-800 mb-1">
               {currentTab === "pending"
@@ -179,7 +194,7 @@ export default async function ApprovalsPage({ searchParams }) {
                       <td className="px-6 py-4 text-right">
                         <Link
                           href={`/approvals/${item.id}`}
-                          className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                          className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                             currentTab === "pending"
                               ? "bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
                               : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
@@ -190,7 +205,7 @@ export default async function ApprovalsPage({ searchParams }) {
                               ? "Xử lý ngay"
                               : "Xem chi tiết"}
                           </span>
-                          <span>→</span>
+                          <FontAwesomeIcon icon={faArrowRight} className="w-2.5 h-2.5" />
                         </Link>
                       </td>
                     </tr>

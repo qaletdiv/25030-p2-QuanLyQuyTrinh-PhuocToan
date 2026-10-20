@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { getMyRequestsApi } from "@/services/requests.api";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faPlus,
+  faFileLines,
+  faArrowRight,
+} from "@fortawesome/free-solid-svg-icons";
+import { getMyRequestsApi, getRequestStatusesApi } from "@/services/requests.api";
 import StatusBadge from "@/components/StatusBadge";
 import RequestFilterBar from "@/components/RequestFilterBar";
 
@@ -7,15 +13,23 @@ export const metadata = {
   title: "Đơn của tôi | Hệ Thống Quản Lý Quy Trình",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function MyRequestsPage({ searchParams }) {
   const resolvedSearchParams = await searchParams;
   const { status, startDate, endDate, search } = resolvedSearchParams || {};
 
   let requests = [];
+  let availableStatuses = [];
   let errorMsg = null;
 
   try {
-    requests = await getMyRequestsApi({ status, startDate, endDate, search });
+    const [reqs, statuses] = await Promise.all([
+      getMyRequestsApi({ status, startDate, endDate, search }),
+      getRequestStatusesApi(),
+    ]);
+    requests = reqs;
+    availableStatuses = statuses;
   } catch (err) {
     errorMsg = err.message || "Không thể tải danh sách đơn";
   }
@@ -37,13 +51,13 @@ export default async function MyRequestsPage({ searchParams }) {
           href="/requests/new"
           className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-sm transition-all hover:shadow cursor-pointer shrink-0"
         >
-          <span className="text-base font-bold leading-none">+</span>
+          <FontAwesomeIcon icon={faPlus} className="w-3.5 h-3.5" />
           <span>Tạo đơn mới</span>
         </Link>
       </div>
 
-      {/* Filter Bar */}
-      <RequestFilterBar />
+      {/* Filter Bar (Đồng bộ Back/Forward và số cấp của luồng) */}
+      <RequestFilterBar availableStatuses={availableStatuses} />
 
       {/* Error Alert */}
       {errorMsg && (
@@ -57,8 +71,8 @@ export default async function MyRequestsPage({ searchParams }) {
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         {requests.length === 0 ? (
           <div className="py-16 text-center px-4">
-            <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400 font-bold text-lg">
-              📄
+            <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-400">
+              <FontAwesomeIcon icon={faFileLines} className="w-6 h-6" />
             </div>
             <h3 className="text-base font-semibold text-slate-800 mb-1">
               Chưa có đơn yêu cầu nào
@@ -70,7 +84,8 @@ export default async function MyRequestsPage({ searchParams }) {
               href="/requests/new"
               className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors cursor-pointer"
             >
-              <span>+ Tạo đơn mới ngay</span>
+              <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+              <span>Tạo đơn mới ngay</span>
             </Link>
           </div>
         ) : (
@@ -130,10 +145,10 @@ export default async function MyRequestsPage({ searchParams }) {
                       <td className="px-6 py-4 text-right">
                         <Link
                           href={`/requests/${item.id}`}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                         >
                           <span>Xem chi tiết</span>
-                          <span className="text-sm">→</span>
+                          <FontAwesomeIcon icon={faArrowRight} className="w-2.5 h-2.5" />
                         </Link>
                       </td>
                     </tr>

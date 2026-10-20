@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFilter, faRotateLeft } from "@fortawesome/free-solid-svg-icons";
 
-export default function RequestFilterBar() {
+export default function RequestFilterBar({ availableStatuses = [] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -18,6 +20,13 @@ export default function RequestFilterBar() {
   const [startDate, setStartDate] = useState(currentStartDate);
   const [endDate, setEndDate] = useState(currentEndDate);
 
+  // ĐỒNG BỘ TRẠNG THÁI KHI URL THAY ĐỔI (Khắc phục lỗi Back/Forward của trình duyệt)
+  useEffect(() => {
+    setSearch(currentSearch);
+    setStartDate(currentStartDate);
+    setEndDate(currentEndDate);
+  }, [currentSearch, currentStartDate, currentEndDate]);
+
   const applyFilters = (newParams) => {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(newParams).forEach(([key, value]) => {
@@ -28,8 +37,11 @@ export default function RequestFilterBar() {
       }
     });
 
+    const queryString = params.toString();
+    const targetUrl = queryString ? `${pathname}?${queryString}` : pathname;
+
     startTransition(() => {
-      router.push(`${pathname}?${params.toString()}`);
+      router.push(targetUrl);
     });
   };
 
@@ -51,18 +63,21 @@ export default function RequestFilterBar() {
     });
   };
 
+  // Danh sách trạng thái động theo cấu hình cấp duyệt của các luồng (A.4)
+  const statusesList =
+    availableStatuses && availableStatuses.length > 0
+      ? availableStatuses
+      : ["Chờ duyệt", "Đang duyệt cấp 2", "Đã duyệt hoàn tất", "Bị từ chối"];
+
   const statusOptions = [
     { label: "Tất cả trạng thái", value: "ALL" },
-    { label: "Chờ duyệt", value: "Chờ duyệt" },
-    { label: "Đang duyệt cấp 2", value: "Đang duyệt cấp 2" },
-    { label: "Đã duyệt hoàn tất", value: "Đã duyệt hoàn tất" },
-    { label: "Bị từ chối", value: "Bị từ chối" },
+    ...statusesList.map((st) => ({ label: st, value: st })),
   ];
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-6">
       <form onSubmit={handleDateFilterSubmit} className="space-y-4">
-        {/* Status Pills */}
+        {/* Status Pills động theo cấu hình các cấp duyệt */}
         <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-slate-100">
           <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 mr-2">
             Trạng thái:
@@ -76,7 +91,7 @@ export default function RequestFilterBar() {
                 onClick={() => handleStatusChange(opt.value)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   isActive
-                    ? "bg-blue-600 text-white shadow-sm"
+                    ? "bg-blue-600 text-white shadow-sm font-semibold"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
@@ -129,9 +144,10 @@ export default function RequestFilterBar() {
             <button
               type="submit"
               disabled={isPending}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer disabled:opacity-60"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-lg transition-colors cursor-pointer disabled:opacity-60 inline-flex items-center justify-center gap-2"
             >
-              {isPending ? "Đang lọc..." : "Áp dụng lọc"}
+              <FontAwesomeIcon icon={faFilter} className="w-3.5 h-3.5" />
+              <span>{isPending ? "Đang lọc..." : "Áp dụng lọc"}</span>
             </button>
             {(currentStatus !== "ALL" ||
               currentStartDate ||
@@ -140,10 +156,11 @@ export default function RequestFilterBar() {
               <button
                 type="button"
                 onClick={handleReset}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2 px-3 rounded-lg transition-colors cursor-pointer"
+                className="bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium py-2 px-3 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 title="Xóa bộ lọc"
               >
-                Đặt lại
+                <FontAwesomeIcon icon={faRotateLeft} className="w-3.5 h-3.5" />
+                <span>Đặt lại</span>
               </button>
             )}
           </div>
