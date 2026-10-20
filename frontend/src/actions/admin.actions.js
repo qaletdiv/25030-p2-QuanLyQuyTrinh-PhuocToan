@@ -34,6 +34,7 @@ export async function createRequestTypeAction(prevState, formData) {
     return {
       success: true,
       message: result.message || "Tạo loại đơn thành công",
+      requestType: result.requestType,
     };
   } catch (err) {
     return {
@@ -69,6 +70,7 @@ export async function updateRequestTypeAction(prevState, formData) {
     return {
       success: true,
       message: result.message || "Cập nhật loại đơn thành công",
+      requestType: result.requestType,
     };
   } catch (err) {
     return {

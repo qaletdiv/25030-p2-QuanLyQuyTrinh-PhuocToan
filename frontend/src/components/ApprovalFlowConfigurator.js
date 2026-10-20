@@ -1,7 +1,23 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faPlus,
+  faTrashCan,
+  faCheck,
+  faCodeBranch,
+  faLayerGroup,
+} from "@fortawesome/free-solid-svg-icons";
 import { updateApprovalFlowAction } from "@/actions/admin.actions";
+
+export const APPROVER_ROLES = [
+  { value: "manager", label: "Trưởng phòng của người tạo (cùng phòng ban)" },
+  { value: "hr", label: "Bộ phận Nhân sự (HR)" },
+  { value: "cfo", label: "Giám đốc / Ban Giám Đốc (CFO)" },
+  { value: "approver", label: "Người duyệt bất kỳ (Approver)" },
+  { value: "admin", label: "Quản trị viên (Admin)" },
+];
 
 export default function ApprovalFlowConfigurator({ initialFlows = [], types = [] }) {
   const [flows, setFlows] = useState(initialFlows);
@@ -13,7 +29,7 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
 
   const currentFlow = flows.find((f) => f.requestTypeId === selectedTypeId) || {
     requestTypeId: selectedTypeId,
-    steps: [{ level: 1, title: "Trưởng phòng phê duyệt", approverRole: "approver" }],
+    steps: [{ level: 1, title: "Trưởng phòng phê duyệt", approverRole: "manager" }],
     conditionalRules: [],
   };
 
@@ -25,7 +41,7 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
     setSelectedTypeId(typeId);
     const flow = flows.find((f) => f.requestTypeId === typeId) || {
       requestTypeId: typeId,
-      steps: [{ level: 1, title: "Trưởng phòng phê duyệt", approverRole: "approver" }],
+      steps: [{ level: 1, title: "Trưởng phòng phê duyệt", approverRole: "manager" }],
       conditionalRules: [],
     };
     setSteps(flow.steps || []);
@@ -75,8 +91,9 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
       operator: ">",
       value: 10000000,
       insertStep: {
+        level: steps.length + 1,
         title: "Giám đốc tài chính (CFO) phê duyệt",
-        approverRole: "approver",
+        approverRole: "cfo",
       },
       description: "Nếu tổng tiền vượt hạn mức quy định thì chèn thêm cấp duyệt",
       isActive: true,
@@ -190,7 +207,8 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
             onClick={handleAddStep}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-semibold text-xs rounded-lg transition-colors cursor-pointer border border-slate-200 shrink-0"
           >
-            <span>+ Thêm cấp duyệt</span>
+            <FontAwesomeIcon icon={faPlus} className="w-3 h-3" />
+            <span>Thêm cấp duyệt</span>
           </button>
         </div>
 
@@ -223,7 +241,7 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
 
                 <div>
                   <select
-                    value={step.approverRole || "approver"}
+                    value={step.approverRole || "manager"}
                     onChange={(e) => {
                       const updated = [...steps];
                       updated[idx].approverRole = e.target.value;
@@ -231,8 +249,11 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                     }}
                     className="w-full px-3.5 py-2 text-sm font-semibold text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-2xs cursor-pointer"
                   >
-                    <option value="approver">Người duyệt (Approver)</option>
-                    <option value="admin">Quản trị viên (Admin)</option>
+                    {APPROVER_ROLES.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -241,10 +262,11 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                 <button
                   type="button"
                   onClick={() => handleRemoveStep(idx)}
-                  className="px-3 py-1.5 text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 border border-rose-200"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 border border-rose-200"
                   title="Xóa cấp duyệt này"
                 >
-                  Xóa
+                  <FontAwesomeIcon icon={faTrashCan} className="w-3 h-3" />
+                  <span>Xóa</span>
                 </button>
               )}
             </div>
@@ -269,7 +291,8 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
             onClick={handleAddRule}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-purple-50 text-slate-700 hover:text-purple-700 font-semibold text-xs rounded-lg transition-colors cursor-pointer border border-slate-200 shrink-0"
           >
-            <span>+ Thêm quy tắc rẽ nhánh</span>
+            <FontAwesomeIcon icon={faCodeBranch} className="w-3 h-3" />
+            <span>Thêm quy tắc rẽ nhánh</span>
           </button>
         </div>
 
@@ -298,13 +321,14 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                   <button
                     type="button"
                     onClick={() => handleRemoveRule(idx)}
-                    className="text-xs text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
+                    className="inline-flex items-center gap-1 text-xs text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
                   >
-                    Xóa quy tắc
+                    <FontAwesomeIcon icon={faTrashCan} className="w-3 h-3" />
+                    <span>Xóa quy tắc</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
                   <div>
                     <label className="block text-slate-700 font-bold mb-1">Trường so sánh</label>
                     <select
@@ -342,7 +366,7 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">Cấp chèn thêm</label>
+                    <label className="block text-slate-700 font-bold mb-1">Tên cấp chèn</label>
                     <input
                       type="text"
                       value={rule.insertStep?.title || ""}
@@ -353,10 +377,27 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                       className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold placeholder:text-slate-400"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Đối tượng duyệt</label>
+                    <select
+                      value={rule.insertStep?.approverRole || "cfo"}
+                      onChange={(e) =>
+                        handleUpdateRule(idx, "insertStep.approverRole", e.target.value)
+                      }
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold cursor-pointer"
+                    >
+                      {APPROVER_ROLES.map((role) => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <p className="text-xs text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200">
-                  💡 Diễn giải: Nếu <strong className="text-slate-900">{rule.field}</strong> {rule.operator} <strong className="text-slate-900">{Number(rule.value).toLocaleString("vi-VN")}</strong>, sau khi duyệt cấp cố định xong, đơn sẽ tự động chèn thêm cấp duyệt: <strong className="text-blue-700 font-bold">{rule.insertStep?.title}</strong>.
+                  💡 Diễn giải: Nếu <strong className="text-slate-900">{rule.field}</strong> {rule.operator} <strong className="text-slate-900">{Number(rule.value).toLocaleString("vi-VN")}</strong>, hệ thống sẽ tự động chèn thêm cấp duyệt: <strong className="text-blue-700 font-bold">{rule.insertStep?.title || "Cấp rẽ nhánh"}</strong> (Người duyệt: <strong className="text-purple-700 font-bold">{APPROVER_ROLES.find(r => r.value === (rule.insertStep?.approverRole || "cfo"))?.label || rule.insertStep?.approverRole}</strong>).
                 </p>
               </div>
             ))}
@@ -379,7 +420,7 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
             </>
           ) : (
             <>
-              <span>✓</span>
+              <FontAwesomeIcon icon={faCheck} className="w-4 h-4" />
               <span>Lưu cấu hình quy trình duyệt</span>
             </>
           )}

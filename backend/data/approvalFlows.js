@@ -2,15 +2,15 @@ const approvalFlowsData = [
   {
     requestTypeId: "rt-leave",
     steps: [
-      { level: 1, title: "Trưởng phòng phê duyệt", approverRole: "approver" },
-      { level: 2, title: "Bộ phận Nhân sự (HR)", approverRole: "approver" },
+      { level: 1, title: "Trưởng phòng phê duyệt", approverRole: "manager" },
+      { level: 2, title: "Bộ phận Nhân sự (HR)", approverRole: "hr" },
     ],
     conditionalRules: [],
   },
   {
     requestTypeId: "rt-purchase",
     steps: [
-      { level: 1, title: "Trưởng phòng phê duyệt", approverRole: "approver" },
+      { level: 1, title: "Trưởng phòng phê duyệt", approverRole: "manager" },
     ],
     conditionalRules: [
       {
@@ -22,7 +22,7 @@ const approvalFlowsData = [
         insertStep: {
           level: 2,
           title: "Giám đốc tài chính (CFO)",
-          approverRole: "approver",
+          approverRole: "cfo",
         },
         description: "Khi tổng tiền > 10.000.000 VND, bắt buộc qua thêm cấp Giám đốc tài chính (CFO) trước khi hoàn tất",
         isActive: true,

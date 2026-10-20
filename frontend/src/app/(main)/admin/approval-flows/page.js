@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getMeApi } from "@/services/auth.api";
 import {
   getAdminApprovalFlowsApi,
   getAdminRequestTypesApi,
@@ -9,6 +11,11 @@ export const metadata = {
 };
 
 export default async function AdminApprovalFlowsPage() {
+  const user = await getMeApi();
+  if (user?.role !== "admin") {
+    redirect(user?.role === "approver" ? "/approvals" : "/dashboard");
+  }
+
   let flows = [];
   let types = [];
   let errorMsg = null;

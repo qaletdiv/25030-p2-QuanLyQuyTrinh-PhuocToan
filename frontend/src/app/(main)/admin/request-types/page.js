@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getMeApi } from "@/services/auth.api";
 import { getAdminRequestTypesApi } from "@/services/admin.api";
 import RequestTypesManager from "@/components/RequestTypesManager";
 
@@ -6,6 +8,11 @@ export const metadata = {
 };
 
 export default async function AdminRequestTypesPage() {
+  const user = await getMeApi();
+  if (user?.role !== "admin") {
+    redirect(user?.role === "approver" ? "/approvals" : "/dashboard");
+  }
+
   let types = [];
   let errorMsg = null;
 

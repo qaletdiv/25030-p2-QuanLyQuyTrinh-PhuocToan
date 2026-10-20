@@ -17,7 +17,7 @@ const approvalLogsData = [
     approverName: "Trần Trưởng Phòng",
     action: "approve",
     note: "Đồng ý cho nhân viên nghỉ phép năm.",
-    timestamp: "2026-09-20T09:00:00.000Z",
+    timestamp: "2026-10-01T15:00:00.000Z",
   },
   {
     id: "log-3",
@@ -27,7 +27,7 @@ const approvalLogsData = [
     approverName: "Vũ Thị Nhân Sự",
     action: "approve",
     note: "Đã kiểm tra quỹ phép năm còn 8 ngày. Phê duyệt hoàn tất.",
-    timestamp: "2026-09-20T14:30:00.000Z",
+    timestamp: "2026-10-02T14:30:00.000Z",
   },
   {
     id: "log-4",
