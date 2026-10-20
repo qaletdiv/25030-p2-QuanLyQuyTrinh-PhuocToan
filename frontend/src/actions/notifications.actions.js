@@ -15,6 +15,7 @@ export async function markNotificationReadAction(id) {
     revalidatePath("/dashboard");
     revalidatePath("/approvals");
     revalidatePath("/requests");
+    revalidatePath("/notifications");
     return { success: true, message: result.message };
   } catch (err) {
     return { success: false, error: err.message };
@@ -28,6 +29,7 @@ export async function markAllNotificationsReadAction() {
     revalidatePath("/dashboard");
     revalidatePath("/approvals");
     revalidatePath("/requests");
+    revalidatePath("/notifications");
     return { success: true, message: result.message };
   } catch (err) {
     return { success: false, error: err.message };

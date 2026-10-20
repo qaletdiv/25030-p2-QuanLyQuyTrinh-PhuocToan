@@ -2,10 +2,18 @@
 
 import { useState, useRef, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faBell,
+  faInbox,
+  faCheckDouble,
+  faArrowRight,
+} from "@fortawesome/free-solid-svg-icons";
 import {
   markNotificationReadAction,
   markAllNotificationsReadAction,
 } from "@/actions/notifications.actions";
+import NotificationsModal from "@/components/NotificationsModal";
 
 export default function NotificationBell({
   initialNotifications = [],
@@ -13,6 +21,7 @@ export default function NotificationBell({
   userRole = "employee",
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [notifications, setNotifications] = useState(initialNotifications);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [isPending, startTransition] = useTransition();
@@ -82,7 +91,7 @@ export default function NotificationBell({
         aria-label="Thông báo"
         title="Thông báo hệ thống"
       >
-        <span className="text-xl leading-none select-none">🔔</span>
+        <FontAwesomeIcon icon={faBell} className="w-5 h-5" />
 
         {/* Số thông báo chưa đọc (Badge đỏ) */}
         {unreadCount > 0 && (
@@ -94,7 +103,7 @@ export default function NotificationBell({
 
       {/* Menu thả xuống (Dropdown Panel) */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in duration-150">
+        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in duration-150">
           {/* Header của Popup */}
           <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
             <div className="flex items-center gap-2">
@@ -113,9 +122,10 @@ export default function NotificationBell({
                 type="button"
                 onClick={handleMarkAllRead}
                 disabled={isPending}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer hover:underline disabled:opacity-50"
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer hover:underline disabled:opacity-50 inline-flex items-center gap-1"
               >
-                Đánh dấu tất cả đã đọc
+                <FontAwesomeIcon icon={faCheckDouble} className="w-3 h-3" />
+                <span>Đánh dấu tất cả đã đọc</span>
               </button>
             )}
           </div>
@@ -124,7 +134,7 @@ export default function NotificationBell({
           <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
             {notifications.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-xs">
-                <span className="text-2xl block mb-2">📭</span>
+                <FontAwesomeIcon icon={faInbox} className="w-8 h-8 text-slate-300 block mx-auto mb-2" />
                 Bạn không có thông báo nào.
               </div>
             ) : (
@@ -175,8 +185,35 @@ export default function NotificationBell({
               })
             )}
           </div>
+
+          {/* Footer nút mở modal xem tất cả thông báo */}
+          <div className="p-2.5 bg-slate-50 border-t border-slate-100 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                setIsModalOpen(true);
+              }}
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1.5 cursor-pointer py-1 px-3 rounded-lg hover:bg-blue-50/60"
+            >
+              <span>Xem tất cả thông báo</span>
+              <FontAwesomeIcon icon={faArrowRight} className="w-2.5 h-2.5" />
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Modal hiển thị toàn bộ thông báo */}
+      <NotificationsModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        notifications={notifications}
+        userRole={userRole}
+        onNotificationsChange={(updated, count) => {
+          setNotifications(updated);
+          setUnreadCount(count);
+        }}
+      />
     </div>
   );
 }
