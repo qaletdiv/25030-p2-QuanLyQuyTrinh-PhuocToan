@@ -72,3 +72,29 @@ export const getRequestDetailApi = async (id) => {
   }
   return data;
 };
+
+// Lấy danh sách trạng thái lọc động theo số cấp của các luồng duyệt (A.4)
+export const getRequestStatusesApi = async () => {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+
+  try {
+    const response = await fetch(`${BASE_URL}/api/requests/statuses`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.statuses || [];
+    }
+  } catch (err) {
+    console.error("Lỗi khi tải danh sách trạng thái luồng duyệt:", err);
+  }
+
+  return ["Chờ duyệt", "Đang duyệt cấp 2", "Đã duyệt hoàn tất", "Bị từ chối"];
+};

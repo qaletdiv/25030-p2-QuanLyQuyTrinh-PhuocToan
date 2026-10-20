@@ -4,6 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createRequestApi } from "@/services/requests.api";
 
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}
+
 export async function createRequestAction(prevState, formData) {
   const requestTypeId = formData.get("requestTypeId");
 
@@ -73,13 +81,54 @@ export async function createRequestAction(prevState, formData) {
     }
   }
 
+  // Xử lý tệp đính kèm (A.3: JPG, PNG, PDF <= 5MB)
+  const attachmentFiles = formData
+    .getAll("attachments")
+    .filter((f) => f && typeof f === "object" && f.name && f.size > 0);
+
+  const attachments = [];
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const ALLOWED_EXTS = [".jpg", ".jpeg", ".png", ".pdf"];
+
+  for (const file of attachmentFiles) {
+    if (file.size > MAX_FILE_SIZE) {
+      return {
+        error: `Tệp "${file.name}" vượt quá dung lượng cho phép (tối đa 5MB)`,
+      };
+    }
+
+    const ext = "." + file.name.split(".").pop().toLowerCase();
+    if (!ALLOWED_EXTS.includes(ext)) {
+      return {
+        error: `Tệp "${file.name}" không hợp lệ. Chỉ chấp nhận định dạng JPG, PNG hoặc PDF`,
+      };
+    }
+
+    let url = "";
+    try {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const base64 = buffer.toString("base64");
+      const mime = file.type || "application/octet-stream";
+      url = `data:${mime};base64,${base64}`;
+    } catch (e) {
+      console.error("Lỗi khi chuyển đổi file đính kèm:", e);
+    }
+
+    attachments.push({
+      name: file.name,
+      size: formatFileSize(file.size),
+      type: file.type,
+      url,
+    });
+  }
+
   let success = false;
 
   try {
     await createRequestApi({
       requestTypeId,
       formData: formPayload,
-      attachments: [],
+      attachments,
     });
 
     revalidatePath("/dashboard");
