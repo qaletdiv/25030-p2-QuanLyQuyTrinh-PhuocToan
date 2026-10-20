@@ -26,6 +26,14 @@ export async function loginAction(prevState, formData) {
       maxAge: 60 * 60 * 24 * 7,
     });
 
+    cookieStore.set("role", data.user.role, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
     success = true;
   } catch (err) {
     return { error: err.message };
@@ -73,5 +81,6 @@ export async function registerAction(prevState, formData) {
 export async function logoutAction() {
   const cookieStore = await cookies();
   cookieStore.delete("token");
+  cookieStore.delete("role");
   redirect("/login");
 }
