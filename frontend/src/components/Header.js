@@ -1,5 +1,6 @@
 import LogoutButton from "@/components/LogoutButton";
 import NotificationBell from "@/components/NotificationBell";
+import MobileNav from "@/components/MobileNav";
 import { getNotificationsApi } from "@/services/notifications.api";
 
 export default async function Header({ user }) {
@@ -35,20 +36,21 @@ export default async function Header({ user }) {
   const initial = user?.name ? user.name.trim().charAt(0).toUpperCase() : "U";
 
   return (
-    <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-8 flex items-center justify-between sticky top-0 z-20 shadow-xs">
-      {/* Bên trái: Breadcrumb định vị chuyên nghiệp */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+    <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20 shadow-xs">
+      {/* Bên trái: Drawer Hamburger trên mobile + Breadcrumb định vị chuyên nghiệp */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        <MobileNav role={user?.role} user={user} />
+        <span className="hidden sm:inline text-xs font-semibold uppercase tracking-wider text-slate-400">
           Cổng thông tin
         </span>
-        <span className="text-slate-300">/</span>
-        <span className="text-sm font-bold text-slate-800">
+        <span className="hidden sm:inline text-slate-300">/</span>
+        <span className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[140px] sm:max-w-none">
           {user?.department || "Nội bộ công ty"}
         </span>
       </div>
 
       {/* Bên phải: Chuông thông báo, User Info & Nút Đăng xuất */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
         {/* Chuông thông báo (A.7) */}
         <NotificationBell
           initialNotifications={notifications}
@@ -57,12 +59,12 @@ export default async function Header({ user }) {
         />
 
         {/* Đường kẻ phân cách */}
-        <div className="h-5 w-px bg-slate-200" />
+        <div className="hidden sm:block h-5 w-px bg-slate-200" />
 
         {/* Khối User Info */}
-        <div className="flex items-center gap-3 pr-2">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Avatar Gradient tròn */}
-          <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-bold text-sm flex items-center justify-center shadow-xs ring-2 ring-white">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center shadow-xs ring-2 ring-white shrink-0">
             {initial}
           </div>
 
@@ -85,7 +87,7 @@ export default async function Header({ user }) {
         </div>
 
         {/* Đường kẻ phân cách */}
-        <div className="h-5 w-px bg-slate-200" />
+        <div className="hidden sm:block h-5 w-px bg-slate-200" />
 
         {/* Nút Đăng xuất */}
         <LogoutButton />

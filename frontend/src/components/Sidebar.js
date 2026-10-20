@@ -1,21 +1,29 @@
 import Image from 'next/image';
 import SidebarNav from '@/components/SidebarNav';
+import {
+  faChartPie,
+  faFileLines,
+  faPenToSquare,
+  faCheckToSlot,
+  faFolderTree,
+  faDiagramProject,
+} from '@fortawesome/free-solid-svg-icons';
 
 export default function Sidebar({ role = 'employee' }) {
   const roleMenus = {
     employee: [
-      { label: 'Tổng quan', href: '/dashboard' },
-      { label: 'Đơn của tôi', href: '/requests' },
-      { label: 'Tạo đơn mới', href: '/requests/new' },
+      { label: 'Tổng quan', href: '/dashboard', icon: faChartPie },
+      { label: 'Đơn của tôi', href: '/requests', icon: faFileLines },
+      { label: 'Tạo đơn mới', href: '/requests/new', icon: faPenToSquare },
     ],
     approver: [
-      { label: 'Tổng quan', href: '/dashboard' },
-      { label: 'Danh sách duyệt đơn', href: '/approvals' },
+      { label: 'Tổng quan', href: '/dashboard', icon: faChartPie },
+      { label: 'Danh sách duyệt đơn', href: '/approvals', icon: faCheckToSlot },
     ],
     admin: [
-      { label: 'Tổng quan', href: '/dashboard' },
-      { label: 'Quản lý loại đơn', href: '/admin/request-types' },
-      { label: 'Cấu hình luồng duyệt', href: '/admin/approval-flows' },
+      { label: 'Tổng quan', href: '/dashboard', icon: faChartPie },
+      { label: 'Quản lý loại đơn', href: '/admin/request-types', icon: faFolderTree },
+      { label: 'Cấu hình luồng duyệt', href: '/admin/approval-flows', icon: faDiagramProject },
     ],
   };
 
@@ -28,7 +36,7 @@ export default function Sidebar({ role = 'employee' }) {
   };
 
   return (
-    <aside className="w-64 bg-slate-950 text-white min-h-screen flex flex-col shrink-0 border-r border-slate-800/80 select-none">
+    <aside className="hidden md:flex w-64 bg-slate-950 text-white min-h-screen flex-col shrink-0 border-r border-slate-800/80 select-none">
       {/* Logo & Header */}
       <div className="h-16 flex items-center gap-3 px-6 border-b border-slate-800/80 bg-slate-950">
         <Image
@@ -37,7 +45,8 @@ export default function Sidebar({ role = 'employee' }) {
           width={32}
           height={32}
           priority
-          className="rounded-lg ring-1 ring-white/10 shrink-0 shadow-xs"
+          unoptimized
+          className="rounded-lg shrink-0 object-contain shadow-xs"
         />
         <div className="min-w-0">
           <span className="font-bold text-sm tracking-tight text-white block truncate">

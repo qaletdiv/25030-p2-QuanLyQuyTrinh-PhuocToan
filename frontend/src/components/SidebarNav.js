@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faChevronRight } from "@fortawesome/free-solid-svg-icons";
 
 export default function SidebarNav({ navItems }) {
   // Lấy chính xác URL trang hiện tại mà trình duyệt đang đứng
@@ -23,26 +25,26 @@ export default function SidebarNav({ navItems }) {
                 : "text-slate-400 hover:text-white hover:bg-slate-800/90 border border-transparent hover:border-slate-700/60 hover:translate-x-1"
             }`}
           >
-            <div className="flex items-center gap-2.5">
-              <span
-                className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                  isActive
-                    ? "bg-white shadow-xs"
-                    : "bg-slate-700 group-hover:bg-blue-400"
-                }`}
-              />
+            <div className="flex items-center gap-3">
+              {item.icon && (
+                <FontAwesomeIcon
+                  icon={item.icon}
+                  className={`w-4 h-4 transition-colors ${
+                    isActive ? "text-white" : "text-slate-400 group-hover:text-blue-400"
+                  }`}
+                />
+              )}
               <span>{item.label}</span>
             </div>
 
-            <span
-              className={`text-xs font-bold transition-all duration-200 ${
+            <FontAwesomeIcon
+              icon={faChevronRight}
+              className={`w-2.5 h-2.5 transition-all duration-200 ${
                 isActive
-                  ? "text-white"
-                  : "text-slate-600 group-hover:text-blue-400 group-hover:translate-x-1"
+                  ? "text-white opacity-100"
+                  : "text-slate-600 opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5"
               }`}
-            >
-              →
-            </span>
+            />
           </Link>
         );
       })}
