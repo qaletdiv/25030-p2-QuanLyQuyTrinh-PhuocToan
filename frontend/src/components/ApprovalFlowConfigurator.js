@@ -16,7 +16,6 @@ export const APPROVER_ROLES = [
   { value: "hr", label: "Bộ phận Nhân sự (HR)" },
   { value: "cfo", label: "Giám đốc / Ban Giám Đốc (CFO)" },
   { value: "approver", label: "Người duyệt bất kỳ (Approver)" },
-  { value: "admin", label: "Quản trị viên (Admin)" },
 ];
 
 export default function ApprovalFlowConfigurator({ initialFlows = [], types = [] }) {

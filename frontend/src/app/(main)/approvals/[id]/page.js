@@ -55,31 +55,58 @@ export default async function ApprovalDetailPage({ params }) {
     );
   }
 
-  // Chuyển hướng theo vai trò: Nhân viên không được vào trang duyệt đơn
-  if (currentUser?.role !== "approver" && currentUser?.role !== "admin") {
-    redirect("/dashboard");
+  // Chuyển hướng theo vai trò: Chỉ người duyệt (approver) mới có quyền vào màn hình xét duyệt
+  if (currentUser?.role !== "approver") {
+    redirect(currentUser?.role === "admin" ? "/admin/approval-flows" : "/dashboard");
   }
 
   const { formData, attachments, flow, logs, creator, handoverUser } = request;
 
-  // Xác định thẩm quyền xử lý tại bước hiện tại
+  // Xác định thẩm quyền xử lý tại bước hiện tại theo đúng cấu hình phân quyền (BUG_001)
   let canApprove = false;
-  if (currentUser?.role === "admin") {
-    canApprove = true;
-  } else if (currentUser?.role === "approver") {
-    const isFinished = request.status === "Đã duyệt hoàn tất" || request.status === "Bị từ chối";
-    if (!isFinished) {
-      const currentLvl = request.currentLevel || 1;
-      const currentStep = flow?.find((s) => s.level === currentLvl);
+  const isFinished = request.status === "Đã duyệt hoàn tất" || request.status === "Bị từ chối";
+  if (!isFinished) {
+    const currentLvl = request.currentLevel || 1;
+    const currentStep = flow?.find((s) => s.level === currentLvl);
 
-      if (currentStep?.level === 1) {
-        // Cấp 1 (Trưởng phòng): Trưởng phòng cùng phòng ban với người tạo đơn
-        canApprove = currentUser.department === creator?.department;
-      } else if (currentStep?.level === 2 && request.requestTypeId === "rt-leave") {
-        // Cấp 2 (HR): Cán bộ phòng Nhân sự
+    if (currentStep) {
+      const role = currentStep.approverRole || "";
+      const title = (currentStep.title || "").toLowerCase();
+
+      // 1. Trưởng phòng của người tạo (cùng phòng ban với người tạo)
+      if (
+        role === "manager" ||
+        title.includes("trưởng phòng") ||
+        title.includes("quản lý") ||
+        (currentStep.level === 1 && !role)
+      ) {
+        canApprove = creator ? currentUser.department === creator.department : false;
+      }
+      // 2. Bộ phận Nhân sự & Hành chính
+      else if (
+        role === "hr" ||
+        title.includes("nhân sự") ||
+        title.includes("hr")
+      ) {
         canApprove = currentUser.department === "Nhân sự & Hành chính";
-      } else {
+      }
+      // 3. Giám đốc / Giám đốc tài chính (CFO / Ban Giám Đốc)
+      else if (
+        role === "cfo" ||
+        role === "director" ||
+        title.includes("tài chính") ||
+        title.includes("cfo") ||
+        title.includes("giám đốc")
+      ) {
+        canApprove =
+          currentUser.department === "Kế toán - Tài chính" ||
+          currentUser.department === "Ban Giám Đốc";
+      }
+      // 4. Người duyệt bất kỳ
+      else if (role === "approver") {
         canApprove = true;
+      } else {
+        canApprove = false;
       }
     }
   }

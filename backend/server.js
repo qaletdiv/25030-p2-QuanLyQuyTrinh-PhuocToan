@@ -301,23 +301,16 @@ app.get('/api/requests/my', authenticate, (req, res) => {
   return res.json(populated);
 });
 
-// Helper phân quyền người duyệt theo đối tượng duyệt (A.6)
+// Helper phân quyền người duyệt theo đối tượng duyệt (A.6, BUG_001)
 function canUserApproveStep(user, step, creator) {
   if (!user || !step) return false;
-  // Quản trị viên (Admin) luôn có toàn quyền duyệt mọi cấp
-  if (user.role === 'admin') return true;
-  // Nhân viên thông thường không có quyền duyệt
+  // Chỉ tài khoản có vai trò 'approver' mới có quyền duyệt đơn
   if (user.role !== 'approver') return false;
 
   const role = step.approverRole || '';
   const title = (step.title || '').toLowerCase();
 
-  // 1. Quản trị viên chỉ định
-  if (role === 'admin') {
-    return user.role === 'admin';
-  }
-
-  // 2. Trưởng phòng của người tạo (cùng phòng ban với người tạo)
+  // 1. Trưởng phòng của người tạo (cùng phòng ban với người tạo)
   if (
     role === 'manager' ||
     title.includes('trưởng phòng') ||
@@ -328,7 +321,7 @@ function canUserApproveStep(user, step, creator) {
     return user.department === creator.department;
   }
 
-  // 3. Bộ phận Nhân sự & Hành chính
+  // 2. Bộ phận Nhân sự & Hành chính
   if (
     role === 'hr' ||
     title.includes('nhân sự') ||
@@ -337,7 +330,7 @@ function canUserApproveStep(user, step, creator) {
     return user.department === 'Nhân sự & Hành chính';
   }
 
-  // 4. Giám đốc / Giám đốc tài chính (CFO / Ban Giám Đốc)
+  // 3. Giám đốc / Giám đốc tài chính (CFO / Ban Giám Đốc)
   if (
     role === 'cfo' ||
     role === 'director' ||
@@ -351,12 +344,12 @@ function canUserApproveStep(user, step, creator) {
     );
   }
 
-  // 5. Người duyệt bất kỳ (Approver)
+  // 4. Người duyệt bất kỳ (Approver)
   if (role === 'approver') {
     return true;
   }
 
-  return true;
+  return false;
 }
 
 // Helper tính toán các cấp duyệt thực tế (hỗ trợ điều kiện rẽ nhánh conditionalRules) (A.6)
@@ -471,9 +464,9 @@ app.get('/api/requests/:id', authenticate, (req, res) => {
    APPROVAL ROUTES (A.5 — Danh sách duyệt đơn & Xử lý phê duyệt)
 ========================================================================= */
 
-// Lấy danh sách đơn cần duyệt và lịch sử duyệt của Approver
+// Lấy danh sách đơn cần duyệt và lịch sử duyệt của Approver (A.5, BUG_001)
 app.get('/api/approvals', authenticate, (req, res) => {
-  if (req.user.role !== 'approver' && req.user.role !== 'admin') {
+  if (req.user.role !== 'approver') {
     return res.status(403).json({ message: 'Bạn không có quyền truy cập danh sách duyệt đơn' });
   }
 
@@ -511,11 +504,8 @@ app.get('/api/approvals', authenticate, (req, res) => {
         return false;
       }
 
-      // Admin duyệt được tất cả
-      if (req.user.role === 'admin') return true;
-
       const effectiveSteps = getEffectiveFlowSteps(r.requestTypeId, r.formData);
-      if (!effectiveSteps.length) return true;
+      if (!effectiveSteps.length) return false;
 
       const currentStep = effectiveSteps.find((s) => s.level === (r.currentLevel || 1));
       if (!currentStep) return false;

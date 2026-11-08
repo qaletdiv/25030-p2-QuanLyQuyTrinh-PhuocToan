@@ -51,11 +51,12 @@ export function middleware(request) {
       }
     }
 
-    // 3.2. Tuyến đường /approvals/* CHỈ dành cho Người duyệt (approver) và Admin
+    // 3.2. Tuyến đường /approvals/* CHỈ dành cho Người duyệt (approver)
     if (pathname.startsWith("/approvals")) {
-      if (role !== "approver" && role !== "admin") {
-        // Nhân viên gõ thẳng URL /approvals sẽ bị chuyển hướng về /dashboard
-        return NextResponse.redirect(new URL("/dashboard", request.url));
+      if (role !== "approver") {
+        // Admin chuyển về /admin/approval-flows, nhân viên chuyển về /dashboard
+        const redirectUrl = role === "admin" ? "/admin/approval-flows" : "/dashboard";
+        return NextResponse.redirect(new URL(redirectUrl, request.url));
       }
     }
   }

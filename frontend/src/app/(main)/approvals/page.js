@@ -17,8 +17,8 @@ export const metadata = {
 
 export default async function ApprovalsPage({ searchParams }) {
   const user = await getMeApi();
-  if (user?.role !== "approver" && user?.role !== "admin") {
-    redirect("/dashboard");
+  if (user?.role !== "approver") {
+    redirect(user?.role === "admin" ? "/admin/approval-flows" : "/dashboard");
   }
   const resolvedSearchParams = await searchParams;
   const currentTab = resolvedSearchParams?.tab || "pending";
