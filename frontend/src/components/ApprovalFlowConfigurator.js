@@ -81,22 +81,38 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
     setSteps(updated);
   };
 
-  // Thêm điều kiện rẽ nhánh mới
+  // Thêm điều kiện rẽ nhánh mới (BUG_003: Phù hợp theo loại đơn ngày hoặc tiền)
   const handleAddRule = () => {
-    const newRule = {
-      id: `cr-${Date.now()}`,
-      name: "Quy tắc rẽ nhánh mới",
-      field: "totalAmount",
-      operator: ">",
-      value: 10000000,
-      insertStep: {
-        level: steps.length + 1,
-        title: "Giám đốc tài chính (CFO) phê duyệt",
-        approverRole: "cfo",
-      },
-      description: "Nếu tổng tiền vượt hạn mức quy định thì chèn thêm cấp duyệt",
-      isActive: true,
-    };
+    const isAmountType = selectedTypeInfo?.formType === "amount" || selectedTypeId === "rt-purchase";
+    const newRule = isAmountType
+      ? {
+          id: `cr-${Date.now()}`,
+          name: "Đơn mua sắm giá trị cao (> 10 triệu)",
+          field: "totalAmount",
+          operator: ">",
+          value: 10000000,
+          insertStep: {
+            level: steps.length + 1,
+            title: "Giám đốc tài chính (CFO) phê duyệt",
+            approverRole: "cfo",
+          },
+          description: "Nếu tổng tiền > 10.000.000 VND thì chèn thêm cấp Giám đốc tài chính phê duyệt",
+          isActive: true,
+        }
+      : {
+          id: `cr-${Date.now()}`,
+          name: "Đơn xin nghỉ dài ngày (> 3 ngày)",
+          field: "totalDays",
+          operator: ">",
+          value: 3,
+          insertStep: {
+            level: steps.length + 1,
+            title: "Ban Giám Đốc phê duyệt",
+            approverRole: "cfo",
+          },
+          description: "Nếu tổng số ngày nghỉ vượt quá 3 ngày thì chèn thêm cấp Ban Giám Đốc phê duyệt",
+          isActive: true,
+        };
     setRules([...rules, newRule]);
   };
 
@@ -332,11 +348,27 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                     <label className="block text-slate-700 font-bold mb-1">Trường so sánh</label>
                     <select
                       value={rule.field}
-                      onChange={(e) => handleUpdateRule(idx, "field", e.target.value)}
+                      onChange={(e) => {
+                        const newField = e.target.value;
+                        const defaultVal = newField === "totalDays" ? 3 : 10000000;
+                        handleUpdateRule(idx, "field", newField);
+                        if ((rule.field === "totalDays" && newField === "totalAmount") || (rule.field === "totalAmount" && newField === "totalDays")) {
+                          handleUpdateRule(idx, "value", defaultVal);
+                        }
+                      }}
                       className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold cursor-pointer"
                     >
-                      <option value="totalAmount">Tổng tiền (totalAmount)</option>
-                      <option value="totalDays">Tổng số ngày (totalDays)</option>
+                      {selectedTypeInfo?.formType === "amount" || selectedTypeId === "rt-purchase" ? (
+                        <>
+                          <option value="totalAmount">Tổng tiền (totalAmount)</option>
+                          <option value="totalDays">Tổng số ngày (totalDays)</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="totalDays">Tổng số ngày (totalDays)</option>
+                          <option value="totalAmount">Tổng tiền (totalAmount)</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
@@ -355,7 +387,9 @@ export default function ApprovalFlowConfigurator({ initialFlows = [], types = []
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">Giá trị ngưỡng</label>
+                    <label className="block text-slate-700 font-bold mb-1">
+                      Giá trị ngưỡng {rule.field === "totalDays" ? "(ngày)" : "(VNĐ)"}
+                    </label>
                     <input
                       type="number"
                       value={rule.value}

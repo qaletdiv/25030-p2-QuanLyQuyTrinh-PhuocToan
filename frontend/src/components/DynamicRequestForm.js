@@ -160,7 +160,11 @@ export default function DynamicRequestForm({
     }
   };
 
-  const isPurchase = selectedTypeId === "rt-purchase";
+  // Xác định giao diện form theo hình thức đơn: Theo tiền (amount/mua sắm) hay Theo ngày (days/thời gian) (BUG_003)
+  const isPurchase =
+    currentType?.formType === "amount" ||
+    selectedTypeId === "rt-purchase" ||
+    currentType?.id === "rt-purchase";
 
   const isSubmitDisabled =
     isPending ||
@@ -236,8 +240,8 @@ export default function DynamicRequestForm({
           <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
             Bước 2: Thông tin chi tiết — {currentType?.name}
           </label>
-          <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-            {isPurchase ? "Mẫu Đơn Mua Hàng & Vật Tư" : "Mẫu Đơn Nghỉ Phép Chuẩn"}
+          <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
+            {isPurchase ? "Mẫu Đơn Mua Hàng & Kinh Phí" : "Mẫu Đơn Theo Ngày & Thời Gian"}
           </span>
         </div>
 

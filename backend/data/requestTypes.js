@@ -5,6 +5,7 @@ const requestTypesData = [
     description:
       "Dành cho nhân viên xin nghỉ phép năm, nghỉ ốm, hoặc nghỉ không lương.",
     isActive: true,
+    formType: "days",
     fields: [
       {
         name: "leaveType",
@@ -51,6 +52,7 @@ const requestTypesData = [
     name: "Đơn mua hàng",
     description: "Dành cho đề xuất mua sắm trang thiết bị, vật tư văn phòng.",
     isActive: true,
+    formType: "amount",
     fields: [
       {
         name: "reason",

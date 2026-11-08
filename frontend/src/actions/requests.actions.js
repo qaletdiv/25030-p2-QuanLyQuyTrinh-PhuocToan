@@ -27,8 +27,8 @@ export async function createRequestAction(prevState, formData) {
     }
   }
 
-  // Xử lý dữ liệu đặc thù cho Đơn mua hàng (rt-purchase)
-  if (requestTypeId === "rt-purchase") {
+  // Xử lý dữ liệu đặc thù cho Đơn mua hàng hoặc đơn tính theo tiền (BUG_003)
+  if (requestTypeId === "rt-purchase" || formPayload.items || formPayload.totalAmount) {
     if (typeof formPayload.items === "string") {
       try {
         formPayload.items = JSON.parse(formPayload.items);

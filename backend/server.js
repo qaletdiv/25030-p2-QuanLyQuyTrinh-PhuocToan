@@ -903,17 +903,32 @@ app.post('/api/admin/request-types', authenticate, (req, res) => {
     return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
   }
 
-  const { name, description, isActive } = req.body;
+  const { name, description, isActive, formType } = req.body;
   if (!name || !name.trim()) {
     return res.status(400).json({ message: 'Tên loại đơn không được để trống' });
   }
 
+  const validFormType = formType === 'amount' ? 'amount' : 'days';
   const newType = {
     id: `rt-${Date.now()}`,
     name: name.trim(),
     description: description ? description.trim() : '',
     isActive: isActive !== undefined ? Boolean(isActive) : true,
-    fields: [],
+    formType: validFormType, // 'days' (Theo ngày) | 'amount' (Theo tiền) (BUG_003)
+    fields: validFormType === 'amount'
+      ? [
+          { name: "reason", label: "Lý do mua sắm", type: "textarea", required: true },
+          { name: "items", label: "Danh sách sản phẩm", type: "table", required: true },
+          { name: "totalAmount", label: "Tổng tiền đơn hàng", type: "number", required: true },
+        ]
+      : [
+          { name: "leaveType", label: "Loại đơn", type: "select", required: true, options: ["Xin nghỉ phép", "Nghỉ việc riêng", "Đi công tác"] },
+          { name: "startDate", label: "Từ ngày", type: "date", required: true },
+          { name: "endDate", label: "Đến ngày", type: "date", required: true },
+          { name: "totalDays", label: "Tổng số ngày", type: "number", required: true },
+          { name: "reason", label: "Lý do chi tiết", type: "textarea", required: true },
+          { name: "handoverUserId", label: "Người bàn giao công việc", type: "colleague-select", required: true },
+        ],
   };
 
   requestTypes.push(newType);
@@ -932,7 +947,7 @@ app.post('/api/admin/request-types', authenticate, (req, res) => {
   });
 });
 
-// 3. Cập nhật loại đơn (A.6)
+// 3. Cập nhật loại đơn (A.6, BUG_003)
 app.put('/api/admin/request-types/:id', authenticate, (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Bạn không có quyền quản trị viên' });
@@ -943,10 +958,13 @@ app.put('/api/admin/request-types/:id', authenticate, (req, res) => {
     return res.status(404).json({ message: 'Không tìm thấy loại đơn' });
   }
 
-  const { name, description, isActive } = req.body;
+  const { name, description, isActive, formType } = req.body;
   if (name !== undefined) type.name = name.trim();
   if (description !== undefined) type.description = description.trim();
   if (isActive !== undefined) type.isActive = Boolean(isActive);
+  if (formType !== undefined) {
+    type.formType = formType === 'amount' ? 'amount' : 'days';
+  }
 
   return res.json({
     success: true,

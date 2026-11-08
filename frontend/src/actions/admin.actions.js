@@ -9,11 +9,12 @@ import {
   updateApprovalFlowApi,
 } from "@/services/admin.api";
 
-// Tạo loại đơn mới
+// Tạo loại đơn mới (A.6, BUG_003)
 export async function createRequestTypeAction(prevState, formData) {
   const name = formData.get("name");
   const description = formData.get("description") || "";
   const isActive = formData.get("isActive") === "true";
+  const formType = formData.get("formType") || "days";
 
   if (!name || !name.trim()) {
     return { success: false, error: "Vui lòng nhập tên loại đơn" };
@@ -24,6 +25,7 @@ export async function createRequestTypeAction(prevState, formData) {
       name: name.trim(),
       description: description.trim(),
       isActive,
+      formType,
     });
 
     revalidatePath("/admin/request-types");
@@ -44,12 +46,13 @@ export async function createRequestTypeAction(prevState, formData) {
   }
 }
 
-// Cập nhật loại đơn
+// Cập nhật loại đơn (A.6, BUG_003)
 export async function updateRequestTypeAction(prevState, formData) {
   const id = formData.get("id");
   const name = formData.get("name");
   const description = formData.get("description") || "";
   const isActive = formData.get("isActive") === "true";
+  const formType = formData.get("formType") || "days";
 
   if (!id || !name || !name.trim()) {
     return { success: false, error: "Dữ liệu cập nhật không hợp lệ" };
@@ -60,6 +63,7 @@ export async function updateRequestTypeAction(prevState, formData) {
       name: name.trim(),
       description: description.trim(),
       isActive,
+      formType,
     });
 
     revalidatePath("/admin/request-types");

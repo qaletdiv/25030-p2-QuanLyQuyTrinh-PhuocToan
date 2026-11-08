@@ -178,7 +178,7 @@ export default async function ApprovalDetailPage({ params }) {
           Nội dung đơn cần thẩm định
         </h2>
 
-        {request.requestTypeId === "rt-purchase" || formData?.items ? (
+        {request.requestTypeId === "rt-purchase" || request.requestType?.formType === "amount" || formData?.items ? (
           <div className="space-y-5 text-sm">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

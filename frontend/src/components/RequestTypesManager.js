@@ -180,6 +180,19 @@ export default function RequestTypesManager({ initialTypes = [] }) {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Hình thức đơn <span className="text-rose-500">*</span>
+              </label>
+              <select
+                name="formType"
+                defaultValue="days"
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+              >
+                <option value="days">Theo ngày / Thời gian (Nghỉ phép, công tác, việc riêng...)</option>
+                <option value="amount">Theo tiền / Mua sắm (Mua hàng, chi phí, tạm ứng...)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Trạng thái áp dụng
               </label>
               <select
@@ -250,6 +263,19 @@ export default function RequestTypesManager({ initialTypes = [] }) {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Hình thức đơn <span className="text-rose-500">*</span>
+              </label>
+              <select
+                name="formType"
+                defaultValue={editingType.formType || (editingType.id === "rt-purchase" ? "amount" : "days")}
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 font-medium"
+              >
+                <option value="days">Theo ngày / Thời gian (Nghỉ phép, công tác, việc riêng...)</option>
+                <option value="amount">Theo tiền / Mua sắm (Mua hàng, chi phí, tạm ứng...)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Trạng thái
               </label>
               <select
@@ -305,6 +331,9 @@ export default function RequestTypesManager({ initialTypes = [] }) {
                   Tên loại đơn
                 </th>
                 <th scope="col" className="px-6 py-3.5">
+                  Hình thức
+                </th>
+                <th scope="col" className="px-6 py-3.5">
                   Mô tả hướng dẫn
                 </th>
                 <th scope="col" className="px-6 py-3.5">
@@ -323,6 +352,17 @@ export default function RequestTypesManager({ initialTypes = [] }) {
                   </td>
                   <td className="px-6 py-4 font-bold text-slate-800">
                     {type.name}
+                  </td>
+                  <td className="px-6 py-4">
+                    {type.formType === "amount" || type.id === "rt-purchase" ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Theo tiền (Mua sắm)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                        Theo ngày (Thời gian)
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-slate-500 max-w-xs truncate">
                     {type.description || "—"}
