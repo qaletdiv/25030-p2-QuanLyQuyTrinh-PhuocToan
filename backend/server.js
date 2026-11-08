@@ -178,6 +178,7 @@ app.post('/api/requests', authenticate, (req, res) => {
     }
   }
 
+  const effectiveSteps = getEffectiveFlowSteps(type.id, formData);
   const newRequestId = `REQ-${String(requests.length + 1).padStart(3, '0')}`;
   const newRequest = {
     id: newRequestId,
@@ -188,13 +189,15 @@ app.post('/api/requests', authenticate, (req, res) => {
     status: 'Chờ duyệt', // Trạng thái ban đầu bắt buộc theo mục 3
     formData,
     attachments: attachments || [],
+    currentLevel: 1,
+    // Snapshot cấu hình luồng duyệt tại thời điểm tạo đơn (BUG_002)
+    flowSteps: effectiveSteps,
   };
 
   requests.unshift(newRequest);
 
   // Kích hoạt thông báo cho Người duyệt cấp 1 của luồng duyệt (A.7)
-  const initialSteps = getEffectiveFlowSteps(type.id, formData);
-  const firstStep = initialSteps[0];
+  const firstStep = effectiveSteps[0];
   if (firstStep) {
     const eligibleApprovers = users.filter((u) => canUserApproveStep(u, firstStep, req.user));
     for (const approver of eligibleApprovers) {
@@ -409,6 +412,21 @@ function getEffectiveFlowSteps(requestTypeId, formData) {
   return steps;
 }
 
+// Helper lấy danh sách cấp duyệt áp dụng cho đơn (ưu tiên luồng đã snapshot tại thời điểm tạo đơn - BUG_002)
+function getRequestFlowSteps(request) {
+  if (request && Array.isArray(request.flowSteps) && request.flowSteps.length > 0) {
+    return request.flowSteps;
+  }
+  return getEffectiveFlowSteps(request?.requestTypeId, request?.formData);
+}
+
+// Snapshot luồng duyệt cố định cho các đơn mẫu ban đầu (BUG_002)
+requests.forEach((r) => {
+  if (!r.flowSteps) {
+    r.flowSteps = getEffectiveFlowSteps(r.requestTypeId, r.formData);
+  }
+});
+
 // Lấy chi tiết đơn yêu cầu kèm tiến trình duyệt & nhật ký (A.4 & A.5)
 app.get('/api/requests/:id', authenticate, (req, res) => {
   const request = requests.find((r) => r.id === req.params.id);
@@ -427,7 +445,7 @@ app.get('/api/requests/:id', authenticate, (req, res) => {
 
   const type = requestTypes.find((t) => t.id === request.requestTypeId);
   const creator = users.find((u) => u.id === request.createdBy);
-  const effectiveSteps = getEffectiveFlowSteps(request.requestTypeId, request.formData);
+  const effectiveSteps = getRequestFlowSteps(request);
   const logs = approvalLogs.filter((l) => l.requestId === request.id);
 
   let handoverUser = null;
@@ -476,7 +494,7 @@ app.get('/api/approvals', authenticate, (req, res) => {
   const formatRequest = (r) => {
     const type = requestTypes.find((t) => t.id === r.requestTypeId);
     const creator = users.find((u) => u.id === r.createdBy);
-    const effectiveSteps = getEffectiveFlowSteps(r.requestTypeId, r.formData);
+    const effectiveSteps = getRequestFlowSteps(r);
     const currentStep = effectiveSteps.find((s) => s.level === (r.currentLevel || 1));
 
     return {
@@ -504,7 +522,7 @@ app.get('/api/approvals', authenticate, (req, res) => {
         return false;
       }
 
-      const effectiveSteps = getEffectiveFlowSteps(r.requestTypeId, r.formData);
+      const effectiveSteps = getRequestFlowSteps(r);
       if (!effectiveSteps.length) return false;
 
       const currentStep = effectiveSteps.find((s) => s.level === (r.currentLevel || 1));
@@ -582,7 +600,7 @@ app.post('/api/requests/:id/approve', authenticate, (req, res) => {
 
   const { note } = req.body;
   const currentLvl = request.currentLevel || 1;
-  const effectiveSteps = getEffectiveFlowSteps(request.requestTypeId, request.formData);
+  const effectiveSteps = getRequestFlowSteps(request);
   const currentStep = effectiveSteps.find((s) => s.level === currentLvl);
   const creator = users.find((u) => u.id === request.createdBy);
 
@@ -684,7 +702,7 @@ app.post('/api/requests/:id/reject', authenticate, (req, res) => {
   }
 
   const currentLvl = request.currentLevel || 1;
-  const effectiveSteps = getEffectiveFlowSteps(request.requestTypeId, request.formData);
+  const effectiveSteps = getRequestFlowSteps(request);
   const currentStep = effectiveSteps.find((s) => s.level === currentLvl);
   const creator = users.find((u) => u.id === request.createdBy);
 

@@ -15,6 +15,10 @@ const requestsData = [
       handoverUserId: "u-employee-2",
     },
     attachments: [{ name: "giay_hen_gia_dinh.pdf", size: "1.2 MB" }],
+    flowSteps: [
+      { level: 1, title: "Trưởng phòng phê duyệt", approverRole: "manager" },
+      { level: 2, title: "Bộ phận Nhân sự (HR)", approverRole: "hr" },
+    ],
     updatedAt: "2026-10-05T08:30:00.000Z",
   },
   {
@@ -33,6 +37,10 @@ const requestsData = [
       handoverUserId: "u-employee-2",
     },
     attachments: [],
+    flowSteps: [
+      { level: 1, title: "Trưởng phòng phê duyệt", approverRole: "manager" },
+      { level: 2, title: "Bộ phận Nhân sự (HR)", approverRole: "hr" },
+    ],
     updatedAt: "2026-10-02T10:15:00.000Z",
   },
   {
@@ -51,6 +59,10 @@ const requestsData = [
       handoverUserId: "u-employee-2",
     },
     attachments: [{ name: "phieu_kham_suc_khoe.png", size: "850 KB" }],
+    flowSteps: [
+      { level: 1, title: "Trưởng phòng phê duyệt", approverRole: "manager" },
+      { level: 2, title: "Bộ phận Nhân sự (HR)", approverRole: "hr" },
+    ],
     updatedAt: "2026-10-02T14:30:00.000Z",
   },
   {
@@ -69,6 +81,10 @@ const requestsData = [
       handoverUserId: "u-employee-2",
     },
     attachments: [],
+    flowSteps: [
+      { level: 1, title: "Trưởng phòng phê duyệt", approverRole: "manager" },
+      { level: 2, title: "Bộ phận Nhân sự (HR)", approverRole: "hr" },
+    ],
     updatedAt: "2026-09-25T11:20:00.000Z",
   },
   {
@@ -87,6 +103,10 @@ const requestsData = [
       totalAmount: 16600000,
     },
     attachments: [{ name: "bao_gia_thiet_bi.pdf", size: "1.5 MB" }],
+    flowSteps: [
+      { level: 1, title: "Trưởng phòng phê duyệt", approverRole: "manager" },
+      { level: 2, title: "Giám đốc tài chính (CFO)", approverRole: "cfo", isConditional: true },
+    ],
     updatedAt: "2026-10-10T10:30:00.000Z",
   },
 ];
